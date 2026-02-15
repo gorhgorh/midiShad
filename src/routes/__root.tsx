@@ -32,6 +32,13 @@ function RootLayout() {
       if (e.key === 'Escape' && isConfig) {
         navigate({ to: '/' })
       }
+      if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (document.fullscreenElement) {
+          document.exitFullscreen()
+        } else {
+          document.documentElement.requestFullscreen()
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
