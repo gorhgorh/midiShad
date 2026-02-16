@@ -1,6 +1,7 @@
 import { createRootRoute, Outlet, useNavigate, useLocation } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { ShaderCanvas } from '../components/ShaderCanvas'
+import { ShaderInfoBar } from '../components/ShaderInfoBar'
 import { useMidi } from '../midi/useMidi'
 import { loadPersisted, setupPersistence } from '../store/persistence'
 
@@ -47,6 +48,7 @@ function RootLayout() {
   return (
     <>
       <ShaderCanvas />
+      <ShaderInfoBar />
       <Outlet />
       {!isConfig && (
         <button

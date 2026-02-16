@@ -89,12 +89,14 @@ export function useMidi() {
 
           if (isParamRelative(deviceId, paramName)) {
             const current = paramValues[paramName] ?? param.default
-            const next = applyRelativeCc(msg.value, current, param.min, param.max)
+            const ccVal = param.invert ? 128 - msg.value : msg.value
+            const next = applyRelativeCc(ccVal, current, param.min, param.max)
             if (next !== null) {
               useShaderStore.getState().setParamValue(paramName, next)
             }
           } else {
-            const val = normalizeCc(msg.value, param.min, param.max)
+            const ccVal = param.invert ? 127 - msg.value : msg.value
+            const val = normalizeCc(ccVal, param.min, param.max)
             useShaderStore.getState().setParamValue(paramName, val)
           }
         }

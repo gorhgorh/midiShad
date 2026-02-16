@@ -2,6 +2,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ShaderSelector } from './ShaderSelector'
 import { DeviceSelector } from './DeviceSelector'
 import { ParamMappingList } from './ParamMappingList'
+import { VideoSelector } from './VideoSelector'
 
 export function ConfigOverlay() {
   const navigate = useNavigate()
@@ -38,6 +39,7 @@ export function ConfigOverlay() {
       >
         <h2 style={{ fontSize: 18, color: '#fff', marginBottom: 16 }}>MidiShad Config</h2>
         <ShaderSelector />
+        <VideoSelector />
         <DeviceSelector />
         <ParamMappingList />
       </div>

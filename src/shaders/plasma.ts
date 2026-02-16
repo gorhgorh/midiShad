@@ -39,6 +39,8 @@ const fragmentShader = /* glsl */ `
 export const plasma: ShaderDefinition = {
   id: 'plasma',
   name: 'Plasma',
+  note: 'Classic RGB plasma with sine wave interference',
+  credit: 'Classic demo scene effect',
   vertexShader,
   fragmentShader,
   params: [

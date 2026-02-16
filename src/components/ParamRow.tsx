@@ -28,6 +28,17 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
     if (editing) inputRef.current?.focus()
   }, [editing])
 
+  useEffect(() => {
+    if (!isLearning) return
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setLearnTarget(null)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [isLearning, setLearnTarget])
+
   function startEdit() {
     if (isLearning) {
       setLearnTarget(null)

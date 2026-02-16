@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { ShaderPlane } from './ShaderPlane'
+import { VideoPlane } from './VideoPlane'
 
 export function ShaderCanvas() {
   return (
@@ -8,6 +9,7 @@ export function ShaderCanvas() {
       camera={{ position: [0, 0, 1] }}
       gl={{ antialias: false }}
     >
+      <VideoPlane />
       <ShaderPlane />
     </Canvas>
   )
