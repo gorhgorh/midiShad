@@ -17,6 +17,8 @@ const fragmentShader = /* glsl */ `
   uniform float u_camDistance;
   uniform float u_glow;
   uniform float u_gap;
+  uniform float u_lightOrbitSpeed;
+  uniform float u_reflectivity;
 
   // --- Hash / pseudo-random ---
   float hash(float n) {
@@ -77,6 +79,59 @@ const fragmentShader = /* glsl */ `
   // --- Hash helpers ---
   vec2 hash2(float n) {
     return vec2(hash(n), hash(n + 137.91));
+  }
+
+  // --- Procedural neon city environment map ---
+  vec3 envMap(vec3 dir) {
+    // Normalize direction to hemisphere angles
+    float theta = atan(dir.z, dir.x); // horizontal angle [-pi, pi]
+    float phi = asin(clamp(dir.y, -1.0, 1.0)); // vertical angle
+
+    // Dark sky gradient base
+    vec3 sky = mix(vec3(0.02, 0.01, 0.05), vec3(0.0, 0.0, 0.02), smoothstep(-0.2, 0.8, dir.y));
+
+    // Building silhouettes — hash-based columns from horizontal angle
+    float colId = floor(theta * 8.0); // ~50 columns around horizon
+    float colHash = hash(colId * 73.19);
+    float buildingHeight = 0.05 + colHash * 0.35; // varies per column
+    float inBuilding = step(dir.y, buildingHeight) * step(-0.1, dir.y);
+
+    // Building body (dark with slight variation)
+    vec3 buildingColor = vec3(0.02, 0.02, 0.04) * (0.5 + colHash * 0.5);
+
+    // Neon window bands — horizontal strips at varying heights
+    float windowY = fract(dir.y * 25.0 + colHash * 3.0);
+    float windowX = fract(theta * 8.0);
+    float windowMask = step(0.7, windowY) * step(0.15, windowX) * step(windowX, 0.85);
+
+    // Window colors — cycle through neon palette per column
+    float colorSel = hash(colId * 17.31);
+    vec3 windowColor = colorSel < 0.33
+      ? vec3(0.2, 0.8, 1.0)   // cyan
+      : (colorSel < 0.66
+        ? vec3(1.0, 0.2, 0.7) // magenta
+        : vec3(1.0, 0.6, 0.1) // orange
+      );
+
+    // Scattered neon signs (bright points)
+    float signHash = hash(floor(theta * 20.0) * 113.7 + floor(dir.y * 30.0) * 271.3);
+    float signMask = step(0.92, signHash) * inBuilding;
+    vec3 signColor = vec3(hash(signHash * 91.0), hash(signHash * 137.0), hash(signHash * 197.0));
+    signColor = normalize(signColor + 0.1) * 1.5; // bright saturated
+
+    // Horizontal LED strips at building tops
+    float topStrip = smoothstep(buildingHeight - 0.02, buildingHeight, dir.y)
+                   * smoothstep(buildingHeight + 0.02, buildingHeight, dir.y);
+    vec3 stripColor = windowColor * 2.0;
+
+    // Compose
+    vec3 col = sky;
+    col = mix(col, buildingColor, inBuilding);
+    col += windowColor * windowMask * inBuilding * 0.8;
+    col += signColor * signMask * 0.6;
+    col += stripColor * topStrip * inBuilding;
+
+    return col;
   }
 
   // --- Chaotic overlapping viewports ---
@@ -218,39 +273,49 @@ const fragmentShader = /* glsl */ `
       // Dark blue base color
       vec3 baseColor = vec3(0.05, 0.08, 0.2);
 
-      // Two light sources
-      vec3 light1 = normalize(vec3(1.0, 1.0, 0.8));
-      vec3 light2 = normalize(vec3(-0.5, 0.5, -1.0));
-
       vec3 viewDir = normalize(camPos - p);
 
-      // Blinn-Phong for light 1
-      float diff1 = max(dot(n, light1), 0.0);
-      vec3 half1 = normalize(light1 + viewDir);
-      float spec1 = pow(max(dot(n, half1), 0.0), u_shininess);
+      // 3 orbiting neon lights
+      vec3 lightColors[3];
+      lightColors[0] = vec3(0.2, 0.8, 1.0);  // cyan
+      lightColors[1] = vec3(1.0, 0.2, 0.7);  // magenta
+      lightColors[2] = vec3(1.0, 0.6, 0.1);  // warm orange
 
-      // Blinn-Phong for light 2
-      float diff2 = max(dot(n, light2), 0.0);
-      vec3 half2 = normalize(light2 + viewDir);
-      float spec2 = pow(max(dot(n, half2), 0.0), u_shininess);
+      vec3 diffuse = baseColor * 0.08; // ambient
+      vec3 specular = vec3(0.0);
 
-      // Ambient
-      float ambient = 0.08;
+      for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float angle = u_time * u_lightOrbitSpeed * (0.5 + fi * 0.3) + fi * 2.094;
+        float y = sin(u_time * u_lightOrbitSpeed * 0.3 + fi * 1.5) * 0.5;
+        vec3 lightPos = vec3(cos(angle) * 3.0, y * 3.0, sin(angle) * 3.0);
+        vec3 lightDir = normalize(lightPos - p);
 
-      // Diffuse contribution
-      vec3 diffuse = baseColor * (ambient + diff1 * 0.7 + diff2 * 0.35);
+        // Blinn-Phong per light
+        float diff = max(dot(n, lightDir), 0.0);
+        vec3 halfVec = normalize(lightDir + viewDir);
+        float spec = pow(max(dot(n, halfVec), 0.0), u_shininess);
 
-      // Specular (white highlights)
-      vec3 specular = vec3(1.0) * (spec1 * 0.8 + spec2 * 0.4);
+        diffuse += baseColor * diff * lightColors[i] * 0.7;
+        specular += lightColors[i] * spec * 0.6;
+      }
 
-      // Fresnel rim light
+      // Fresnel
       float fresnel = pow(1.0 - max(dot(viewDir, n), 0.0), 3.0);
       vec3 rim = vec3(0.15, 0.2, 0.5) * fresnel;
 
       // Self-illumination / emissive glow
       vec3 emissive = baseColor * 2.0 * u_glow;
 
-      col = diffuse + specular + rim + emissive;
+      // Lit surface color
+      vec3 litColor = diffuse + specular + rim + emissive;
+
+      // Procedural env map reflection
+      vec3 reflDir = reflect(-viewDir, n);
+      vec3 envColor = envMap(reflDir);
+      float reflAmount = fresnel * u_reflectivity;
+
+      col = mix(litColor, envColor, reflAmount);
     }
 
     // Tone mapping (simple Reinhard)
@@ -276,5 +341,7 @@ export const allSeeingEye: ShaderDefinition = {
     { name: 'u_camDistance', label: 'Cam Distance', min: 2, max: 8, default: 4 },
     { name: 'u_glow', label: 'Glow', min: 0, max: 1, default: 0.15 },
     { name: 'u_gap', label: 'Viewport Gap', min: 0, max: 0.02, default: 0.002 },
+    { name: 'u_lightOrbitSpeed', label: 'Light Orbit', min: 0, max: 3, default: 0.8 },
+    { name: 'u_reflectivity', label: 'Reflectivity', min: 0, max: 1, default: 0.5 },
   ],
 }
