@@ -5,13 +5,13 @@ import { useShaderStore } from '../store/shaderStore'
 
 export function ShaderPlane() {
   const materialRef = useRef<THREE.ShaderMaterial>(null)
-  const { size } = useThree()
+  const { size, viewport } = useThree()
   const shader = useShaderStore((s) => s.activeShader)
 
   const uniforms = useMemo(() => {
     const u: Record<string, THREE.IUniform> = {
       u_time: { value: 0 },
-      u_resolution: { value: new THREE.Vector2(size.width, size.height) },
+      u_resolution: { value: new THREE.Vector2(size.width * viewport.dpr, size.height * viewport.dpr) },
     }
     for (const p of shader.params) {
       u[p.name] = { value: p.default }
@@ -32,7 +32,7 @@ export function ShaderPlane() {
     const mat = materialRef.current
     if (!mat) return
     mat.uniforms.u_time.value = clock.getElapsedTime()
-    mat.uniforms.u_resolution.value.set(size.width, size.height)
+    mat.uniforms.u_resolution.value.set(size.width * viewport.dpr, size.height * viewport.dpr)
 
     // Read param values directly from store (no React re-render)
     const { paramValues } = useShaderStore.getState()
@@ -51,6 +51,7 @@ export function ShaderPlane() {
         vertexShader={shader.vertexShader}
         fragmentShader={shader.fragmentShader}
         uniforms={uniforms}
+        transparent
       />
     </mesh>
   )

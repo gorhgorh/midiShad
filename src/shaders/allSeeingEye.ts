@@ -74,55 +74,69 @@ const fragmentShader = /* glsl */ `
     return -1.0;
   }
 
-  // --- BSP viewport subdivision ---
-  // Returns: vec4(xMin, yMin, xMax, yMax) for the viewport this pixel belongs to,
-  // and sets camIndex to identify which camera.
-  vec4 bspViewport(vec2 uv, int numCams, out int camIndex) {
-    float xMin = 0.0, yMin = 0.0, xMax = 1.0, yMax = 1.0;
-    int remaining = numCams;
-    camIndex = 0;
+  // --- Hash helpers ---
+  vec2 hash2(float n) {
+    return vec2(hash(n), hash(n + 137.91));
+  }
+
+  // --- Chaotic overlapping viewports ---
+  // Each viewport has a random position, wild aspect ratio, and depth (z-index).
+  // Highest depth viewport containing this pixel wins.
+  // Returns vec4(xMin, yMin, xMax, yMax), sets camIndex.
+  vec4 chaoticViewport(vec2 uv, int numCams, out int camIndex) {
+    camIndex = -1;
+    vec4 bestVp = vec4(0.0);
+    int bestDepth = -1;
 
     for (int i = 0; i < 9; i++) {
-      if (remaining <= 1) break;
+      if (i >= numCams) break;
 
-      float w = xMax - xMin;
-      float h = yMax - yMin;
+      float fi = float(i);
+      float seed = fi * 31.17 + float(numCams) * 173.29;
 
-      // how many cameras go in the "left/bottom" partition
-      int leftCount = remaining / 2;
-      int rightCount = remaining - leftCount;
-      float ratio = float(leftCount) / float(remaining);
+      // spread centers across the full screen, including edges
+      vec2 center = hash2(seed + 1.0);
 
-      // perturb ratio a bit with hash for visual variety
-      ratio = mix(ratio, ratio + (hash(float(i) * 7.3 + 0.5) - 0.5) * 0.2, 0.5);
-      ratio = clamp(ratio, 0.25, 0.75);
-
-      if (w >= h) {
-        // split vertically
-        float splitX = xMin + w * ratio;
-        if (uv.x < splitX) {
-          xMax = splitX;
-          remaining = leftCount;
-        } else {
-          xMin = splitX;
-          camIndex += leftCount;
-          remaining = rightCount;
-        }
+      // wild random dimensions — elongated ratios like 2:10, 1:8, etc.
+      float dimSeed = hash(seed + 50.0);
+      float w, h;
+      if (dimSeed < 0.3) {
+        // very wide strip
+        w = 0.5 + hash(seed + 60.0) * 0.5;
+        h = 0.05 + hash(seed + 61.0) * 0.12;
+      } else if (dimSeed < 0.6) {
+        // very tall strip
+        w = 0.05 + hash(seed + 62.0) * 0.12;
+        h = 0.5 + hash(seed + 63.0) * 0.5;
+      } else if (dimSeed < 0.8) {
+        // medium chaotic rectangle
+        w = 0.2 + hash(seed + 64.0) * 0.5;
+        h = 0.2 + hash(seed + 65.0) * 0.5;
       } else {
-        // split horizontally
-        float splitY = yMin + h * ratio;
-        if (uv.y < splitY) {
-          yMax = splitY;
-          remaining = leftCount;
-        } else {
-          yMin = splitY;
-          camIndex += leftCount;
-          remaining = rightCount;
+        // large block
+        w = 0.4 + hash(seed + 66.0) * 0.5;
+        h = 0.4 + hash(seed + 67.0) * 0.5;
+      }
+
+      // viewport bounds, clamped to screen
+      float xMin = max(center.x - w * 0.5, 0.0);
+      float yMin = max(center.y - h * 0.5, 0.0);
+      float xMax = min(center.x + w * 0.5, 1.0);
+      float yMax = min(center.y + h * 0.5, 1.0);
+
+      // higher index = higher depth (drawn on top)
+      int depth = i;
+
+      if (uv.x >= xMin && uv.x <= xMax && uv.y >= yMin && uv.y <= yMax) {
+        if (depth > bestDepth) {
+          bestDepth = depth;
+          camIndex = i;
+          bestVp = vec4(xMin, yMin, xMax, yMax);
         }
       }
     }
 
-    return vec4(xMin, yMin, xMax, yMax);
+    return bestVp;
   }
 
   // --- Camera from golden-ratio spiral on sphere ---
@@ -152,15 +166,23 @@ const fragmentShader = /* glsl */ `
     int numCams = int(floor(u_numCameras));
     if (numCams < 1) numCams = 1;
 
-    // BSP layout
+    // Chaotic overlapping layout
     int camIdx;
-    vec4 vp = bspViewport(uv, numCams, camIdx);
+    vec4 vp = chaoticViewport(uv, numCams, camIdx);
 
-    // Gap check — black border between viewports
-    float gapPx = u_gap;
-    if (uv.x < vp.x + gapPx || uv.x > vp.z - gapPx ||
-        uv.y < vp.y + gapPx || uv.y > vp.w - gapPx) {
-      gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    // No viewport — transparent
+    if (camIdx < 0) {
+      gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+      return;
+    }
+
+    // White frame — uniform pixel width on all sides
+    vec2 pixelSize = vec2(1.0) / u_resolution;
+    float borderPx = u_gap * u_resolution.y; // convert to pixel count
+    vec2 border = pixelSize * borderPx;
+    if (uv.x < vp.x + border.x || uv.x > vp.z - border.x ||
+        uv.y < vp.y + border.y || uv.y > vp.w - border.y) {
+      gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
       return;
     }
 
@@ -187,7 +209,7 @@ const fragmentShader = /* glsl */ `
     // Ray march
     float t = rayMarch(camPos, rd);
 
-    vec3 col = vec3(0.0); // black background
+    vec3 col = vec3(0.03, 0.03, 0.03); // near-black matte background
 
     if (t > 0.0) {
       vec3 p = camPos + rd * t;
@@ -253,6 +275,6 @@ export const allSeeingEye: ShaderDefinition = {
     { name: 'u_cubeSize', label: 'Cube Size', min: 0.2, max: 1.5, default: 0.7 },
     { name: 'u_camDistance', label: 'Cam Distance', min: 2, max: 8, default: 4 },
     { name: 'u_glow', label: 'Glow', min: 0, max: 1, default: 0.15 },
-    { name: 'u_gap', label: 'Viewport Gap', min: 0, max: 0.05, default: 0.01 },
+    { name: 'u_gap', label: 'Viewport Gap', min: 0, max: 0.02, default: 0.002 },
   ],
 }
