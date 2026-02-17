@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { ParamDescriptor } from '../shaders/types'
 import { useShaderStore } from '../store/shaderStore'
 import { useMidiStore } from '../store/midiStore'
+import { useLfoStore } from '../store/lfoStore'
 
 interface ParamRowProps {
   param: ParamDescriptor
@@ -18,6 +19,10 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
   const assignCc = useMidiStore((s) => s.assignCc)
   const unassignParam = useMidiStore((s) => s.unassignParam)
   const toggleRelative = useMidiStore((s) => s.toggleRelative)
+  const lfoEnabled = useLfoStore((s) => s.configs[param.name]?.enabled ?? false)
+  const lfoPeriod = useLfoStore((s) => s.configs[param.name]?.period ?? 4)
+  const toggleLfo = useLfoStore((s) => s.toggleLfo)
+  const setLfoPeriod = useLfoStore((s) => s.setLfoPeriod)
   const isLearning = learnTarget === param.name
 
   const [editing, setEditing] = useState(false)
@@ -169,6 +174,47 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
                 x
               </button>
             </>
+          )}
+          <button
+            onClick={() => toggleLfo(param.name)}
+            title="Toggle LFO modulation"
+            style={{
+              fontSize: 10,
+              padding: '2px 5px',
+              background: lfoEnabled ? '#1a5' : '#222',
+              color: lfoEnabled ? '#fff' : '#666',
+              border: lfoEnabled ? '1px solid #2d8' : '1px solid #444',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontWeight: lfoEnabled ? 700 : 400,
+            }}
+          >
+            LFO
+          </button>
+          {lfoEnabled && (
+            <input
+              type="number"
+              min={0.1}
+              max={60}
+              step={0.1}
+              value={lfoPeriod}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value)
+                if (!isNaN(v) && v >= 0.1 && v <= 60) setLfoPeriod(param.name, v)
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+              title="LFO period in seconds"
+              style={{
+                width: 44,
+                fontSize: 10,
+                padding: '2px 3px',
+                background: '#111',
+                color: '#2d8',
+                border: '1px solid #1a5',
+                borderRadius: 4,
+                textAlign: 'center',
+              }}
+            />
           )}
         </>
       )}

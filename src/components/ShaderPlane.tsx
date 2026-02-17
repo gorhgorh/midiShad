@@ -2,6 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useShaderStore } from '../store/shaderStore'
+import { useLfoStore } from '../store/lfoStore'
 
 export function ShaderPlane() {
   const materialRef = useRef<THREE.ShaderMaterial>(null)
@@ -35,11 +36,22 @@ export function ShaderPlane() {
     mat.uniforms.u_resolution.value.set(size.width * viewport.dpr, size.height * viewport.dpr)
 
     // Read param values directly from store (no React re-render)
-    const { paramValues } = useShaderStore.getState()
+    const { paramValues, activeShader } = useShaderStore.getState()
+    const { configs: lfoConfigs } = useLfoStore.getState()
+    const elapsed = clock.getElapsedTime()
+
     for (const key of Object.keys(paramValues)) {
-      if (mat.uniforms[key]) {
-        mat.uniforms[key].value = paramValues[key]
+      if (!mat.uniforms[key]) continue
+      const lfo = lfoConfigs[key]
+      if (lfo?.enabled) {
+        const p = activeShader.params.find((d) => d.name === key)
+        if (p) {
+          const sine = Math.sin(elapsed * 2 * Math.PI / lfo.period) * 0.5 + 0.5
+          mat.uniforms[key].value = p.min + sine * (p.max - p.min)
+          continue
+        }
       }
+      mat.uniforms[key].value = paramValues[key]
     }
   })
 

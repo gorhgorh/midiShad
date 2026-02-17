@@ -2,6 +2,7 @@ import { useShaderStore } from './shaderStore'
 import { useMidiStore } from './midiStore'
 import { useVideoStore } from './videoStore'
 import type { VideoSourceType } from './videoStore'
+import { useLfoStore } from './lfoStore'
 
 const KEYS = {
   device: 'midishad:device',
@@ -10,6 +11,7 @@ const KEYS = {
   relativeFlags: 'midishad:relativeFlags',
   videoSource: 'midishad:videoSource',
   videoUrl: 'midishad:videoUrl',
+  lfoConfigs: 'midishad:lfoConfigs',
 } as const
 
 export function loadPersisted() {
@@ -28,6 +30,11 @@ export function loadPersisted() {
     const relRaw = localStorage.getItem(KEYS.relativeFlags)
     if (relRaw) {
       useMidiStore.setState({ relativeFlags: JSON.parse(relRaw) })
+    }
+
+    const lfoRaw = localStorage.getItem(KEYS.lfoConfigs)
+    if (lfoRaw) {
+      useLfoStore.setState({ configs: JSON.parse(lfoRaw) })
     }
 
     const videoSource = localStorage.getItem(KEYS.videoSource) as VideoSourceType | null
@@ -53,6 +60,10 @@ export function setupPersistence() {
     }
     localStorage.setItem(KEYS.mappings, JSON.stringify(state.mappings))
     localStorage.setItem(KEYS.relativeFlags, JSON.stringify(state.relativeFlags))
+  })
+
+  useLfoStore.subscribe((state) => {
+    localStorage.setItem(KEYS.lfoConfigs, JSON.stringify(state.configs))
   })
 
   useVideoStore.subscribe((state) => {
