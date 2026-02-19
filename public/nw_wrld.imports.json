@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "motion": "./libs/motion.bundle.js"
+  }
+}

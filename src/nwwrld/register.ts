@@ -7,6 +7,7 @@ import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { Noise } from 'noisejs'
+import * as motion from 'motion'
 import { ModuleBase } from './ModuleBase'
 import { BaseThreeJsModule } from './BaseThreeJsModule'
 
@@ -20,6 +21,7 @@ Object.assign(globalThis, {
   p5,
   d3,
   Noise,
+  motion,
   // Asset helpers — resolve paths relative to public/ (served at / by Vite).
   // Full URLs (http/data) are passed through as-is.
   assetUrl: (path: string) => {

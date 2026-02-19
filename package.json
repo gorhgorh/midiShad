@@ -12,6 +12,7 @@
   "dependencies": {
     "@tanstack/react-router": "^1.160.0",
     "d3": "^7.9.0",
+    "motion": "^12.34.2",
     "noisejs": "^2.1.0",
     "p5": "^1.11.11",
     "react": "^19.2.0",
