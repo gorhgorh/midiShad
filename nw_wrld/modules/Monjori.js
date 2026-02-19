@@ -4,7 +4,6 @@
 @nwWrld imports: ModuleBase
 */
 
-console.log("Monjori");
 
 const VERTEX_SHADER = `
   attribute vec2 position;

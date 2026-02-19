@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { parseCc, normalizeCc, applyRelativeCc } from './midiUtils'
 import { useMidiStore, getMappingsForDevice, isParamRelative } from '../store/midiStore'
-import { useShaderStore } from '../store/shaderStore'
+import { useModuleStore } from '../store/moduleStore'
 
 export function useMidi() {
   const [access, setAccess] = useState<MIDIAccess | null>(null)
@@ -68,36 +68,37 @@ export function useMidi() {
 
         // Find next param without a CC (assignCc sets learnTarget to null, so re-read mappings)
         const updatedMapping = getMappingsForDevice(deviceId)
-        const { activeShader } = useShaderStore.getState()
-        const nextUnassigned = activeShader.params.find(
-          (p) => updatedMapping[p.name] == null
-        )
-        if (nextUnassigned) {
-          useMidiStore.getState().setLearnTarget(nextUnassigned.name)
+        const { activeModule } = useModuleStore.getState()
+        if (activeModule) {
+          const nextUnassigned = activeModule.params.find(
+            (p) => updatedMapping[p.name] == null
+          )
+          if (nextUnassigned) {
+            useMidiStore.getState().setLearnTarget(nextUnassigned.name)
+          }
         }
         return
       }
 
       // Normal mode: find param mapped to this CC and update
       const mapping = getMappingsForDevice(deviceId)
-      const { activeShader, paramValues } = useShaderStore.getState()
+      const { activeModule, paramValues } = useModuleStore.getState()
+      if (!activeModule) return
 
       for (const [paramName, ccNum] of Object.entries(mapping)) {
         if (ccNum === msg.cc) {
-          const param = activeShader.params.find((p) => p.name === paramName)
+          const param = activeModule.params.find((p) => p.name === paramName)
           if (!param) continue
 
           if (isParamRelative(deviceId, paramName)) {
             const current = paramValues[paramName] ?? param.default
-            const ccVal = param.invert ? 128 - msg.value : msg.value
-            const next = applyRelativeCc(ccVal, current, param.min, param.max)
+            const next = applyRelativeCc(msg.value, current, param.min, param.max)
             if (next !== null) {
-              useShaderStore.getState().setParamValue(paramName, next)
+              useModuleStore.getState().setParamValue(paramName, next)
             }
           } else {
-            const ccVal = param.invert ? 127 - msg.value : msg.value
-            const val = normalizeCc(ccVal, param.min, param.max)
-            useShaderStore.getState().setParamValue(paramName, val)
+            const val = normalizeCc(msg.value, param.min, param.max)
+            useModuleStore.getState().setParamValue(paramName, val)
           }
         }
       }

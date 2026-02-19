@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { useShaderStore } from '../store/shaderStore'
+import { useModuleStore } from '../store/moduleStore'
 import { config } from '../config'
 
-export function ShaderInfoBar() {
-  const shader = useShaderStore((s) => s.activeShader)
+export function ModuleInfoBar() {
+  const activeModule = useModuleStore((s) => s.activeModule)
   const [visible, setVisible] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
@@ -40,13 +40,13 @@ export function ShaderInfoBar() {
         transition,
       }}
     >
-      {shader.note ? (
+      {activeModule ? (
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-          {shader.note}
+          {activeModule.name}
         </span>
       ) : <span />}
 
-      {shader.credit ? (
+      {activeModule?.category ? (
         <span
           style={{
             fontSize: 11,
@@ -56,7 +56,7 @@ export function ShaderInfoBar() {
             borderRadius: 6,
           }}
         >
-          {shader.credit}
+          {activeModule.category}
         </span>
       ) : <span />}
     </div>

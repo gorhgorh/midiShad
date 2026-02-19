@@ -1,23 +1,19 @@
-import { useShaderStore } from './shaderStore'
+import { useModuleStore } from './moduleStore'
 import { useMidiStore } from './midiStore'
-import { useVideoStore } from './videoStore'
-import type { VideoSourceType } from './videoStore'
 import { useLfoStore } from './lfoStore'
 
 const KEYS = {
   device: 'midishad:device',
-  shader: 'midishad:shader',
+  module: 'midishad:module',
   mappings: 'midishad:mappings',
   relativeFlags: 'midishad:relativeFlags',
-  videoSource: 'midishad:videoSource',
-  videoUrl: 'midishad:videoUrl',
   lfoConfigs: 'midishad:lfoConfigs',
 } as const
 
 export function loadPersisted() {
   try {
-    const shaderId = localStorage.getItem(KEYS.shader)
-    if (shaderId) useShaderStore.getState().setActiveShader(shaderId)
+    const moduleId = localStorage.getItem(KEYS.module)
+    if (moduleId) useModuleStore.getState().setActiveModule(moduleId)
 
     const deviceId = localStorage.getItem(KEYS.device)
     if (deviceId) useMidiStore.getState().setSelectedDevice(deviceId)
@@ -36,22 +32,16 @@ export function loadPersisted() {
     if (lfoRaw) {
       useLfoStore.setState({ configs: JSON.parse(lfoRaw) })
     }
-
-    const videoSource = localStorage.getItem(KEYS.videoSource) as VideoSourceType | null
-    const videoUrl = localStorage.getItem(KEYS.videoUrl)
-    // Only restore url and webcam sources (file blob URLs don't survive reload)
-    if (videoSource && videoSource !== 'file') {
-      if (videoUrl) useVideoStore.getState().setUrl(videoUrl)
-      useVideoStore.getState().setSourceType(videoSource)
-    }
   } catch {
     // ignore corrupt localStorage
   }
 }
 
 export function setupPersistence() {
-  useShaderStore.subscribe((state) => {
-    localStorage.setItem(KEYS.shader, state.activeShader.id)
+  useModuleStore.subscribe((state) => {
+    if (state.activeModule) {
+      localStorage.setItem(KEYS.module, state.activeModule.id)
+    }
   })
 
   useMidiStore.subscribe((state) => {
@@ -64,10 +54,5 @@ export function setupPersistence() {
 
   useLfoStore.subscribe((state) => {
     localStorage.setItem(KEYS.lfoConfigs, JSON.stringify(state.configs))
-  })
-
-  useVideoStore.subscribe((state) => {
-    localStorage.setItem(KEYS.videoSource, state.sourceType)
-    localStorage.setItem(KEYS.videoUrl, state.url)
   })
 }

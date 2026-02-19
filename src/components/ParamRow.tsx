@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import type { ParamDescriptor } from '../shaders/types'
-import { useShaderStore } from '../store/shaderStore'
+import type { ParamDescriptor } from '../types'
+import { useModuleStore } from '../store/moduleStore'
 import { useMidiStore } from '../store/midiStore'
 import { useLfoStore } from '../store/lfoStore'
 
@@ -11,8 +11,8 @@ interface ParamRowProps {
 }
 
 export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
-  const value = useShaderStore((s) => s.paramValues[param.name] ?? param.default)
-  const setParamValue = useShaderStore((s) => s.setParamValue)
+  const value = useModuleStore((s) => s.paramValues[param.name] ?? param.default)
+  const setParamValue = useModuleStore((s) => s.setParamValue)
   const learnTarget = useMidiStore((s) => s.learnTarget)
   const setLearnTarget = useMidiStore((s) => s.setLearnTarget)
   const selectedDeviceId = useMidiStore((s) => s.selectedDeviceId)
