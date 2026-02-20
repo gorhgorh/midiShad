@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RouteOff } from 'lucide-react'
 import { LfoWavePreview } from './LfoWavePreview'
 import { useLfoStore, LFO_SLOT_IDS, type LfoSlotId } from '@/store/lfoStore'
 import type { LfoShape, Divider, LfoParamName } from '@/lfo/engine'
@@ -266,11 +267,13 @@ export function LfoPanel() {
   const [activeSlot, setActiveSlot] = useState<LfoSlotId>('lfo1')
   const showOverlay = useLfoStore((s) => s.showLfoOverlay)
   const toggleOverlay = useLfoStore((s) => s.toggleLfoOverlay)
+  const resetLfo = useLfoStore((s) => s.resetLfo)
 
   return (
     <div className="w-full space-y-3">
       <div className="flex items-center justify-between">
-        <ButtonGroup>
+        <div className="flex items-center gap-1.5">
+          <ButtonGroup>
           {LFO_SLOT_IDS.map((id) => (
             <Button
               key={id}
@@ -287,7 +290,15 @@ export function LfoPanel() {
               {LFO_LABELS[id]}
             </Button>
           ))}
-        </ButtonGroup>
+          </ButtonGroup>
+          <button
+            onClick={() => resetLfo(activeSlot)}
+            className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors cursor-pointer"
+            title={`Reset ${LFO_LABELS[activeSlot]}`}
+          >
+            <RouteOff className="h-3 w-3" />
+          </button>
+        </div>
         <label className="flex items-center gap-1.5 cursor-pointer">
           <Checkbox
             checked={showOverlay}

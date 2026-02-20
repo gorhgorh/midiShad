@@ -19,6 +19,7 @@ interface ModuleState {
   setParamValue: (name: string, value: number) => void
   setOptionValue: (name: string, value: unknown) => void
   setCallAction: (fn: ((methodName: string) => void) | null) => void
+  resetModuleParams: () => void
 }
 
 function defaultParams(mod: ModuleDefinition): Record<string, number> {
@@ -100,4 +101,17 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
     }),
 
   setCallAction: (fn) => set({ callAction: fn }),
+
+  resetModuleParams: () => {
+    const { activeModule } = get()
+    if (!activeModule) return
+    const params = defaultParams(activeModule)
+    const options = defaultOptions(activeModule)
+    set((s) => ({
+      paramValues: params,
+      optionValues: options,
+      paramCache: { ...s.paramCache, [activeModule.id]: params },
+      optionCache: { ...s.optionCache, [activeModule.id]: options },
+    }))
+  },
 }))

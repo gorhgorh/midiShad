@@ -35,6 +35,8 @@ interface LfoState {
   setLfoParamBaseValue: (lfoId: LfoSlotId, param: LfoParamName, value: number) => void
   setLfoLearnTarget: (target: string | null) => void
   setCcValue: (ccNumber: number, value: number) => void
+  resetLfo: (id: LfoSlotId) => void
+  resetAllLfos: () => void
 
   // Legacy compat
   configs: Record<string, { enabled: boolean; period: number }>
@@ -101,6 +103,38 @@ export const useLfoStore = create<LfoState>((set, get) => ({
     set((s) => ({
       ccValues: { ...s.ccValues, [ccNumber]: value },
     })),
+
+  resetLfo: (id) =>
+    set((s) => {
+      const lfoParamMods = { ...s.lfoParamMods }
+      const lfoParamBaseValues = { ...s.lfoParamBaseValues }
+      for (const key of Object.keys(lfoParamMods)) {
+        if (key.startsWith(`${id}.`)) {
+          delete lfoParamMods[key]
+          delete lfoParamBaseValues[key]
+        }
+      }
+      return {
+        lfos: { ...s.lfos, [id]: createDefaultLfo() },
+        lfoParamMods,
+        lfoParamBaseValues,
+      }
+    }),
+
+  resetAllLfos: () =>
+    set({
+      lfos: {
+        lfo1: createDefaultLfo(),
+        lfo2: createDefaultLfo(),
+        lfo3: createDefaultLfo(),
+        lfo4: createDefaultLfo(),
+      },
+      assignments: {},
+      baseValues: {},
+      lfoParamMods: {},
+      lfoParamBaseValues: {},
+      lfoLearnTarget: null,
+    }),
 
   // Legacy compat layer
   configs: {},

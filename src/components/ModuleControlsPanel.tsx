@@ -12,22 +12,34 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { ChevronLeft, ChevronRight, GripVertical, List } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { ChevronLeft, ChevronRight, GripVertical, List, RouteOff } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
+import { useLfoStore } from '@/store/lfoStore'
 
 interface ModuleControlsPanelProps {
   visible: boolean
 }
 
-function SectionHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
+function SectionHeader({ label, open, onToggle, onReset }: { label: string; open: boolean; onToggle: () => void; onReset?: () => void }) {
   return (
-    <CollapsibleTrigger
-      onClick={onToggle}
-      className="flex w-full items-center gap-1.5 py-2.5 text-xs font-medium text-white/70 uppercase tracking-wide hover:text-white transition-colors cursor-pointer border-b border-white/10 mb-2"
-    >
-      <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} />
-      {label}
-    </CollapsibleTrigger>
+    <div className="flex items-center border-b border-white/10 mb-2">
+      <CollapsibleTrigger
+        onClick={onToggle}
+        className="flex flex-1 items-center gap-1.5 py-2.5 text-xs font-medium text-white/70 uppercase tracking-wide hover:text-white transition-colors cursor-pointer"
+      >
+        <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} />
+        {label}
+      </CollapsibleTrigger>
+      {onReset && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onReset() }}
+          className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors cursor-pointer"
+          title={`Reset ${label}`}
+        >
+          <RouteOff className="h-3 w-3" />
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -58,6 +70,14 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
     byCategory.set(m.category, list)
   }
 
+  const resetModule = useModuleStore((s) => s.resetModuleParams)
+  const resetAllLfos = useLfoStore((s) => s.resetAllLfos)
+
+  const resetAll = useCallback(() => {
+    resetModule()
+    resetAllLfos()
+  }, [resetModule, resetAllLfos])
+
   const moduleParams = activeModule?.params.filter((p) => p.group !== 'base') ?? []
   const baseParams = activeModule?.params.filter((p) => p.group === 'base') ?? []
   const moduleActions = activeModule?.actions.filter((a) => a.group !== 'base') ?? []
@@ -85,6 +105,13 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
           className="shrink-0 p-0.5 rounded hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
         >
           <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); resetAll() }}
+          className="shrink-0 p-0.5 rounded hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors cursor-pointer"
+          title="Reset All"
+        >
+          <RouteOff className="h-3.5 w-3.5" />
         </button>
         <Popover open={listOpen} onOpenChange={setListOpen}>
           <PopoverTrigger asChild>
@@ -121,7 +148,7 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
         {/* Module params section */}
         {(moduleParams.length > 0 || activeModule?.options.length || moduleActions.length > 0) && (
           <Collapsible open={moduleOpen} onOpenChange={setModuleOpen}>
-            <SectionHeader label="Module" open={moduleOpen} onToggle={() => setModuleOpen(!moduleOpen)} />
+            <SectionHeader label="Module" open={moduleOpen} onToggle={() => setModuleOpen(!moduleOpen)} onReset={resetModule} />
             <CollapsibleContent className="pt-3 px-0.5">
               <ParamMappingList
                 params={moduleParams}
@@ -148,7 +175,7 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
 
         {/* LFO section */}
         <Collapsible open={lfoOpen} onOpenChange={setLfoOpen}>
-          <SectionHeader label="LFO" open={lfoOpen} onToggle={() => setLfoOpen(!lfoOpen)} />
+          <SectionHeader label="LFO" open={lfoOpen} onToggle={() => setLfoOpen(!lfoOpen)} onReset={resetAllLfos} />
           <CollapsibleContent className="pt-3 px-0.5">
             <LfoPanel />
           </CollapsibleContent>

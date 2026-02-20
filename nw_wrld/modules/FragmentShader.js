@@ -25,12 +25,13 @@ uniform float u_ripple_scale;
 
 void main()
 {
+    vec2 mo = (u_mouse.xy / u_resolution - 0.5) * 2.0;
     fragColor = vec4(0.0);
     vec3 w,
     p;
     for(float z, d = 0.1, i, f; i++ < 1e2; fragColor += 0.03 / abs(mix(p, w, 0.1).y + vec4(0, 1, 2, 3) / 1e2) * d, z += d = 0.3 * (length(cos(p.xz * u_ripple_scale)) - 0.4))
     {
-        for(p = z * (gl_FragCoord.rgb * 2.0 - vec3(u_resolution, 1.0).xyy) / vec3(u_resolution, 1.0).y + 1.0, w = p, f = 0.0; f++ < 5.0; )
+        for(p = z * (gl_FragCoord.rgb * 2.0 - vec3(u_resolution, 1.0).xyy) / vec3(u_resolution, 1.0).y + vec3(1.0 + mo.x, 1.0 + mo.y, 1.0), w = p, f = 0.0; f++ < 5.0; )
         {
             w += sin(w.zxy * f - 9.0 * exp( - d / 0.1) + u_time) / f;
         }
@@ -53,6 +54,7 @@ class FragmentShader extends ModuleBase {
       name: "mousePosition",
       executeOnLoad: false,
       options: [
+        { name: "mouseActive", defaultVal: false, type: "boolean" },
         { name: "mouseX", defaultVal: 0.5, type: "number", min: 0.0, max: 1.0 },
         { name: "mouseY", defaultVal: 0.5, type: "number", min: 0.0, max: 1.0 },
       ],
@@ -87,6 +89,7 @@ class FragmentShader extends ModuleBase {
     this.frame = 0;
     this.lastTime = 0;
     this.timeScale = 1.0;
+    this.mouseActive = false;
     this.mouse = [0, 0, 0, 0];
     this.colorR = 1.0;
     this.colorG = 1.0;
@@ -168,6 +171,8 @@ class FragmentShader extends ModuleBase {
     this.canvas.addEventListener("mouseup", this.boundMouseUp);
 
     this.resizeCanvas();
+    this.mouse[0] = this.canvas.width / 2;
+    this.mouse[1] = this.canvas.height / 2;
     window.addEventListener("resize", this.boundResize);
     this.animate();
     this.show();
@@ -199,6 +204,7 @@ class FragmentShader extends ModuleBase {
   }
 
   onMouseMove(e) {
+    if (!this.mouseActive) return;
     const r = this.canvas.getBoundingClientRect();
     this.mouse[0] =
       ((e.clientX - r.left) / r.width) * this.canvas.width;
@@ -207,11 +213,13 @@ class FragmentShader extends ModuleBase {
   }
 
   onMouseDown() {
+    if (!this.mouseActive) return;
     this.mouse[2] = this.mouse[0];
     this.mouse[3] = this.mouse[1];
   }
 
   onMouseUp() {
+    if (!this.mouseActive) return;
     this.mouse[2] = 0;
     this.mouse[3] = 0;
   }
@@ -220,7 +228,8 @@ class FragmentShader extends ModuleBase {
     this.timeScale = Number(timeScale) || 1.0;
   }
 
-  mousePosition({ mouseX = 0.5, mouseY = 0.5 } = {}) {
+  mousePosition({ mouseActive, mouseX = 0.5, mouseY = 0.5 } = {}) {
+    if (mouseActive !== undefined) this.mouseActive = !!mouseActive;
     if (!this.canvas) return;
     this.mouse[0] = mouseX * this.canvas.width;
     this.mouse[1] = mouseY * this.canvas.height;
