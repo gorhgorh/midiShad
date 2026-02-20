@@ -2,7 +2,24 @@ import { useState, useRef, useEffect } from 'react'
 import type { ParamDescriptor } from '../types'
 import { useModuleStore } from '../store/moduleStore'
 import { useMidiStore } from '../store/midiStore'
-import { useLfoStore } from '../store/lfoStore'
+import { useLfoStore, LFO_SLOT_IDS, type LfoSlotId } from '../store/lfoStore'
+import { Slider } from '@/components/ui/slider'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+
+const LFO_COLORS: Record<LfoSlotId, string> = {
+  lfo1: '#6ee7b7',
+  lfo2: '#93c5fd',
+  lfo3: '#fca5a5',
+  lfo4: '#fde68a',
+}
 
 interface ParamRowProps {
   param: ParamDescriptor
@@ -19,10 +36,9 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
   const assignCc = useMidiStore((s) => s.assignCc)
   const unassignParam = useMidiStore((s) => s.unassignParam)
   const toggleRelative = useMidiStore((s) => s.toggleRelative)
-  const lfoEnabled = useLfoStore((s) => s.configs[param.name]?.enabled ?? false)
-  const lfoPeriod = useLfoStore((s) => s.configs[param.name]?.period ?? 4)
-  const toggleLfo = useLfoStore((s) => s.toggleLfo)
-  const setLfoPeriod = useLfoStore((s) => s.setLfoPeriod)
+  const lfoAssignment = useLfoStore((s) => s.assignments[param.name] ?? null)
+  const assignParam = useLfoStore((s) => s.assignParam)
+  const setBaseValue = useLfoStore((s) => s.setBaseValue)
   const isLearning = learnTarget === param.name
 
   const [editing, setEditing] = useState(false)
@@ -36,9 +52,7 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
   useEffect(() => {
     if (!isLearning) return
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setLearnTarget(null)
-      }
+      if (e.key === 'Escape') setLearnTarget(null)
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
@@ -67,26 +81,33 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
     e.stopPropagation()
   }
 
+  function onSliderChange([v]: number[]) {
+    setParamValue(param.name, v)
+    // Track base value for bipolar LFO
+    setBaseValue(param.name, v)
+  }
+
   const hasCc = ccNumber != null
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
-      <label style={{ width: 90, fontSize: 13, color: '#ccc' }}>{param.label}</label>
-      <input
-        type="range"
+    <div className="flex items-center gap-1.5 py-1">
+      <label className="w-[80px] shrink-0 text-xs text-white/70 truncate" title={param.label}>
+        {param.label}
+      </label>
+      <Slider
         min={param.min}
         max={param.max}
         step={(param.max - param.min) / 200}
-        value={value}
-        onChange={(e) => setParamValue(param.name, parseFloat(e.target.value))}
-        style={{ flex: 1 }}
+        value={[value]}
+        onValueChange={onSliderChange}
+        className="flex-1"
       />
-      <span style={{ width: 44, fontSize: 12, color: '#888', textAlign: 'right' }}>
+      <span className="w-[38px] text-[10px] text-white/70 text-right tabular-nums">
         {value.toFixed(1)}
       </span>
 
       {editing ? (
-        <input
+        <Input
           ref={inputRef}
           type="number"
           min={0}
@@ -95,128 +116,72 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commitEdit}
           onKeyDown={onKeyDown}
-          style={{
-            width: 55,
-            fontSize: 11,
-            padding: '2px 4px',
-            background: '#111',
-            color: '#fff',
-            border: '1px solid #88f',
-            borderRadius: 4,
-            textAlign: 'center',
-          }}
+          className="w-[50px] h-6 text-[10px] text-center px-1"
         />
       ) : (
-        <>
-          <button
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant={isLearning ? 'destructive' : 'outline'}
+            size="sm"
+            className="h-5 px-1.5 text-[10px]"
             onClick={() => setLearnTarget(isLearning ? null : param.name)}
-            style={{
-              fontSize: 11,
-              padding: '2px 6px',
-              background: isLearning ? '#f44' : '#333',
-              color: '#fff',
-              border: isLearning ? '1px solid #f88' : '1px solid #555',
-              borderRadius: 4,
-              cursor: 'pointer',
-              minWidth: 50,
-            }}
           >
             {isLearning ? 'Cancel' : hasCc ? `CC${ccNumber}` : 'Learn'}
-          </button>
+          </Button>
           {!isLearning && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-5 px-1 text-[10px]"
               onClick={startEdit}
               title="Type CC number"
-              style={{
-                fontSize: 10,
-                padding: '2px 5px',
-                background: '#222',
-                color: '#888',
-                border: '1px solid #444',
-                borderRadius: 4,
-                cursor: 'pointer',
-              }}
             >
               #
-            </button>
+            </Button>
           )}
           {hasCc && selectedDeviceId && (
             <>
-              <button
+              <Button
+                variant={isRelative ? 'default' : 'outline'}
+                size="sm"
+                className="h-5 px-1.5 text-[10px]"
                 onClick={() => toggleRelative(selectedDeviceId, param.name)}
-                title={isRelative ? 'Relative mode (click to switch to absolute)' : 'Absolute mode (click to switch to relative)'}
-                style={{
-                  fontSize: 10,
-                  padding: '2px 5px',
-                  background: isRelative ? '#47a' : '#222',
-                  color: isRelative ? '#fff' : '#666',
-                  border: isRelative ? '1px solid #6af' : '1px solid #444',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  fontWeight: isRelative ? 700 : 400,
-                }}
+                title={isRelative ? 'Relative mode' : 'Absolute mode'}
               >
                 Rel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-5 px-1 text-[10px] text-destructive-foreground"
                 onClick={() => unassignParam(selectedDeviceId, param.name)}
-                title="Remove CC assignment"
-                style={{
-                  fontSize: 10,
-                  padding: '2px 5px',
-                  background: '#222',
-                  color: '#a66',
-                  border: '1px solid #533',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                }}
+                title="Remove CC"
               >
                 x
-              </button>
+              </Button>
             </>
           )}
-          <button
-            onClick={() => toggleLfo(param.name)}
-            title="Toggle LFO modulation"
-            style={{
-              fontSize: 10,
-              padding: '2px 5px',
-              background: lfoEnabled ? '#1a5' : '#222',
-              color: lfoEnabled ? '#fff' : '#666',
-              border: lfoEnabled ? '1px solid #2d8' : '1px solid #444',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontWeight: lfoEnabled ? 700 : 400,
-            }}
+          {/* LFO assignment dropdown */}
+          <Select
+            value={lfoAssignment ?? '__none__'}
+            onValueChange={(v) => assignParam(param.name, v === '__none__' ? null : v as LfoSlotId)}
           >
-            LFO
-          </button>
-          {lfoEnabled && (
-            <input
-              type="number"
-              min={0.1}
-              max={60}
-              step={0.1}
-              value={lfoPeriod}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value)
-                if (!isNaN(v) && v >= 0.1 && v <= 60) setLfoPeriod(param.name, v)
-              }}
-              onKeyDown={(e) => e.stopPropagation()}
-              title="LFO period in seconds"
-              style={{
-                width: 44,
-                fontSize: 10,
-                padding: '2px 3px',
-                background: '#111',
-                color: '#2d8',
-                border: '1px solid #1a5',
-                borderRadius: 4,
-                textAlign: 'center',
-              }}
-            />
-          )}
-        </>
+            <SelectTrigger
+              className="h-5 w-[52px] px-1 text-[10px]"
+              style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment], borderColor: LFO_COLORS[lfoAssignment] + '80' } : undefined}
+            >
+              <SelectValue placeholder="LFO" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None</SelectItem>
+              {LFO_SLOT_IDS.map((id, i) => (
+                <SelectItem key={id} value={id}>
+                  <span style={{ color: LFO_COLORS[id] }}>LFO {i + 1}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
     </div>
   )

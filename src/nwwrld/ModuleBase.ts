@@ -8,6 +8,12 @@ export class ModuleBase {
   externalElements: HTMLElement[]
   destroyed: boolean
 
+  // Transform state — tracked separately so they compose correctly
+  _tx = 0
+  _ty = 0
+  _scale = 1
+  _rot = 0
+
   constructor(container: HTMLElement) {
     this.elem = document.createElement('div')
     const w = window.innerWidth
@@ -21,6 +27,15 @@ export class ModuleBase {
     console.log('[ModuleBase] elem dimensions:', this.elem.clientWidth, 'x', this.elem.clientHeight)
   }
 
+  _applyTransform() {
+    if (!this.elem) return
+    const parts: string[] = []
+    if (this._tx !== 0 || this._ty !== 0) parts.push(`translate(${this._tx}px, ${this._ty}px)`)
+    if (this._scale !== 1) parts.push(`scale(${this._scale})`)
+    if (this._rot !== 0) parts.push(`rotate(${this._rot}deg)`)
+    this.elem.style.transform = parts.join(' ')
+  }
+
   show() {
     if (this.elem) this.elem.style.visibility = 'visible'
   }
@@ -30,15 +45,14 @@ export class ModuleBase {
   }
 
   offset({ x = 0, y = 0 } = {}) {
-    if (this.elem) {
-      this.elem.style.transform = `translate(${x}px, ${y}px)`
-    }
+    this._tx = x
+    this._ty = y
+    this._applyTransform()
   }
 
   scale({ scale = 1 } = {}) {
-    if (this.elem) {
-      this.elem.style.transform = `scale(${scale})`
-    }
+    this._scale = scale
+    this._applyTransform()
   }
 
   opacity({ opacity = 1 } = {}) {
@@ -48,9 +62,8 @@ export class ModuleBase {
   }
 
   rotate({ degrees = 0 } = {}) {
-    if (this.elem) {
-      this.elem.style.transform = `rotate(${degrees}deg)`
-    }
+    this._rot = degrees
+    this._applyTransform()
   }
 
   destroy() {

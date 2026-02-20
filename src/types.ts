@@ -6,6 +6,7 @@ export interface ParamDescriptor {
   default: number
   /** Method name on the module instance to call when this param changes */
   methodName: string
+  group?: 'module' | 'base'
 }
 
 export interface OptionDescriptor {
@@ -18,6 +19,7 @@ export interface OptionDescriptor {
   max?: number
   /** Method name on the module instance to call when this option changes */
   methodName: string
+  group?: 'module' | 'base'
 }
 
 export interface ActionDescriptor {
@@ -25,6 +27,7 @@ export interface ActionDescriptor {
   label: string
   /** Method name on the module instance to call */
   methodName: string
+  group?: 'module' | 'base'
 }
 
 export interface ModuleDefinition {

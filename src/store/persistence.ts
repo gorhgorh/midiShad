@@ -1,6 +1,8 @@
 import { useModuleStore } from './moduleStore'
 import { useMidiStore } from './midiStore'
 import { useLfoStore } from './lfoStore'
+import { useClockStore } from './clockStore'
+import { createDefaultLfo } from '../lfo/engine'
 
 const KEYS = {
   device: 'midishad:device',
@@ -8,6 +10,11 @@ const KEYS = {
   mappings: 'midishad:mappings',
   relativeFlags: 'midishad:relativeFlags',
   lfoConfigs: 'midishad:lfoConfigs',
+  lfos: 'midishad:lfos',
+  lfoAssignments: 'midishad:lfoAssignments',
+  clock: 'midishad:clock',
+  paramCache: 'midishad:paramCache',
+  optionCache: 'midishad:optionCache',
 } as const
 
 export function loadPersisted() {
@@ -28,9 +35,52 @@ export function loadPersisted() {
       useMidiStore.setState({ relativeFlags: JSON.parse(relRaw) })
     }
 
+    // New LFO format — merge with defaults so missing/stale fields get filled
+    const lfosRaw = localStorage.getItem(KEYS.lfos)
+    if (lfosRaw) {
+      const persisted = JSON.parse(lfosRaw)
+      const merged: Record<string, unknown> = {}
+      for (const key of ['lfo1', 'lfo2', 'lfo3', 'lfo4']) {
+        merged[key] = { ...createDefaultLfo(), ...persisted[key] }
+      }
+      useLfoStore.setState({ lfos: merged } as Partial<ReturnType<typeof useLfoStore.getState>>)
+    }
+
+    const assignRaw = localStorage.getItem(KEYS.lfoAssignments)
+    if (assignRaw) {
+      useLfoStore.setState({ assignments: JSON.parse(assignRaw) })
+    }
+
+    // Legacy LFO configs migration
     const lfoRaw = localStorage.getItem(KEYS.lfoConfigs)
-    if (lfoRaw) {
-      useLfoStore.setState({ configs: JSON.parse(lfoRaw) })
+    if (lfoRaw && !lfosRaw) {
+      // Old format: Record<paramName, { enabled, period }>
+      // Migrate: set assignments for enabled params to lfo1
+      const oldConfigs = JSON.parse(lfoRaw)
+      const assignments: Record<string, string | null> = {}
+      for (const [paramName, cfg] of Object.entries(oldConfigs)) {
+        const c = cfg as { enabled: boolean; period: number }
+        if (c.enabled) assignments[paramName] = 'lfo1'
+      }
+      useLfoStore.setState({ assignments, configs: oldConfigs })
+    }
+
+    // Clock
+    const clockRaw = localStorage.getItem(KEYS.clock)
+    if (clockRaw) {
+      const clock = JSON.parse(clockRaw)
+      if (clock.bpm) useClockStore.getState().setBpm(clock.bpm)
+      if (clock.source) useClockStore.getState().setSource(clock.source)
+    }
+
+    // Param/option caches
+    const paramCacheRaw = localStorage.getItem(KEYS.paramCache)
+    if (paramCacheRaw) {
+      useModuleStore.setState({ paramCache: JSON.parse(paramCacheRaw) })
+    }
+    const optionCacheRaw = localStorage.getItem(KEYS.optionCache)
+    if (optionCacheRaw) {
+      useModuleStore.setState({ optionCache: JSON.parse(optionCacheRaw) })
     }
   } catch {
     // ignore corrupt localStorage
@@ -42,6 +92,8 @@ export function setupPersistence() {
     if (state.activeModule) {
       localStorage.setItem(KEYS.module, state.activeModule.id)
     }
+    localStorage.setItem(KEYS.paramCache, JSON.stringify(state.paramCache))
+    localStorage.setItem(KEYS.optionCache, JSON.stringify(state.optionCache))
   })
 
   useMidiStore.subscribe((state) => {
@@ -53,6 +105,12 @@ export function setupPersistence() {
   })
 
   useLfoStore.subscribe((state) => {
+    localStorage.setItem(KEYS.lfos, JSON.stringify(state.lfos))
+    localStorage.setItem(KEYS.lfoAssignments, JSON.stringify(state.assignments))
     localStorage.setItem(KEYS.lfoConfigs, JSON.stringify(state.configs))
+  })
+
+  useClockStore.subscribe((state) => {
+    localStorage.setItem(KEYS.clock, JSON.stringify({ bpm: state.bpm, source: state.source }))
   })
 }

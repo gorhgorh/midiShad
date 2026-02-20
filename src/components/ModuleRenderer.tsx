@@ -1,7 +1,18 @@
 import { useEffect, useRef } from 'react'
 import { useModuleStore } from '../store/moduleStore'
 import { useLfoStore } from '../store/lfoStore'
+import { useClockStore } from '../store/clockStore'
+import { computeLfo } from '../lfo/engine'
 import type { ModuleInstance, ModuleDefinition } from '../types'
+
+/** Maps base_* param names to the arg name the base method expects */
+const BASE_ARG_MAP: Record<string, string> = {
+  base_offsetX: 'x',
+  base_offsetY: 'y',
+  base_scale: 'scale',
+  base_opacity: 'opacity',
+  base_rotate: 'degrees',
+}
 
 function callMethod(instance: ModuleInstance, methodName: string, args: Record<string, unknown>, moduleClass?: ModuleDefinition['moduleClass']) {
   // nw_wrld modules often shadow prototype methods with instance properties
@@ -14,12 +25,19 @@ function callMethod(instance: ModuleInstance, methodName: string, args: Record<s
   if (typeof fn !== 'function') {
     fn = instance[methodName]
   }
-  console.log('[callMethod]', methodName, typeof fn, args)
   if (typeof fn === 'function') {
     (fn as (a: Record<string, unknown>) => void).call(instance, args)
-  } else {
-    console.warn(`[callMethod] "${methodName}" not found`, { instanceVal: typeof instance[methodName], protoVal: moduleClass ? typeof moduleClass.prototype[methodName] : 'n/a' })
   }
+}
+
+/** Remap base_* param names to the arg names base methods expect */
+function remapBaseArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(args)) {
+    const mapped = BASE_ARG_MAP[key]
+    out[mapped ?? key] = val
+  }
+  return out
 }
 
 export function ModuleRenderer() {
@@ -27,6 +45,7 @@ export function ModuleRenderer() {
   const instanceRef = useRef<ModuleInstance | null>(null)
   const activeModRef = useRef<ModuleDefinition | null>(null)
   const rafRef = useRef<number | null>(null)
+  const visibleRef = useRef(true)
 
   // Mount / swap module instances + react to all store changes
   useEffect(() => {
@@ -45,6 +64,7 @@ export function ModuleRenderer() {
         instanceRef.current = null
       }
       activeModRef.current = activeModule
+      visibleRef.current = true
 
       try {
         const instance = new activeModule.moduleClass(container) as ModuleInstance
@@ -68,7 +88,17 @@ export function ModuleRenderer() {
       useModuleStore.getState().setCallAction((methodName: string) => {
         const inst = instanceRef.current
         const mod = activeModRef.current
-        if (inst && mod) callMethod(inst, methodName, {}, mod.moduleClass)
+        if (!inst || !mod) return
+
+        // Handle visibility toggle
+        if (methodName === 'base_toggleVisibility') {
+          visibleRef.current = !visibleRef.current
+          if (visibleRef.current) inst.show()
+          else inst.hide()
+          return
+        }
+
+        callMethod(inst, methodName, {}, mod.moduleClass)
       })
     }
 
@@ -118,13 +148,14 @@ export function ModuleRenderer() {
           }
         }
         for (const [method, args] of Object.entries(batched)) {
-          callMethod(instance, method, args, activeModule.moduleClass)
+          // Base methods need arg remapping (base_offsetX → x, etc.)
+          const isBase = Object.keys(args).some((k) => k in BASE_ARG_MAP)
+          const remapped = isBase ? remapBaseArgs(args) : args
+          callMethod(instance, method, remapped, activeModule.moduleClass)
         }
       }
 
-      // Option values changed? Batch by methodName so methods that accept
-      // multiple options (e.g. position({left, right, top, bottom})) get
-      // all values in one call.
+      // Option values changed? Batch by methodName
       if (state.optionValues !== prevOptionValues) {
         prevOptionValues = state.optionValues
         const batched: Record<string, Record<string, unknown>> = {}
@@ -159,17 +190,31 @@ export function ModuleRenderer() {
       const activeModule = activeModRef.current
       if (!instance || !activeModule) return
 
-      const { configs } = useLfoStore.getState()
+      const { lfos, assignments, baseValues } = useLfoStore.getState()
+      const { bpm } = useClockStore.getState()
       const elapsed = performance.now() / 1000
 
       for (const param of activeModule.params) {
-        const lfo = configs[param.name]
-        if (!lfo?.enabled) continue
+        const lfoId = assignments[param.name]
+        if (!lfoId) continue
 
-        const sine = Math.sin((elapsed * 2 * Math.PI) / lfo.period) * 0.5 + 0.5
-        const val = param.min + sine * (param.max - param.min)
+        const lfo = lfos[lfoId]
+        if (!lfo) continue
 
-        // Update store so sliders reflect LFO
+        const lfoOutput = computeLfo(lfo, bpm, elapsed)
+        const base = baseValues[param.name] ?? param.default
+        const range = param.max - param.min
+
+        let val: number
+        if (lfo.bipolar) {
+          // Oscillate ± around base value
+          val = base + lfoOutput * range
+        } else {
+          // Unipolar: sweep from param.min to param.min + lfoOutput * range
+          val = param.min + lfoOutput * range
+        }
+
+        val = Math.max(param.min, Math.min(param.max, val))
         useModuleStore.getState().setParamValue(param.name, val)
       }
     }
@@ -183,16 +228,7 @@ export function ModuleRenderer() {
   return (
     <div
       ref={containerRef}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        zIndex: 0,
-        overflow: 'hidden',
-        background: '#000',
-      }}
+      className="fixed inset-0 w-screen h-screen z-0 overflow-hidden bg-black"
     />
   )
 }

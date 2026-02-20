@@ -170,6 +170,23 @@ export async function loadModules(): Promise<ModuleDefinition[]> {
     const methods: MethodDef[] = (ModClass as unknown as { methods?: MethodDef[] }).methods ?? []
     const { params, options, actions, executeOnLoadMethods } = extractParams(methods)
 
+    // Append base transform params (available on every module via ModuleBase)
+    params.push(
+      { name: 'base_offsetX', label: 'Offset X', min: -1000, max: 1000, default: 0, methodName: 'offset', group: 'base' },
+      { name: 'base_offsetY', label: 'Offset Y', min: -1000, max: 1000, default: 0, methodName: 'offset', group: 'base' },
+      { name: 'base_scale', label: 'Scale', min: 0.1, max: 5, default: 1, methodName: 'scale', group: 'base' },
+      { name: 'base_opacity', label: 'Opacity', min: 0, max: 1, default: 1, methodName: 'opacity', group: 'base' },
+      { name: 'base_rotate', label: 'Rotate', min: 0, max: 360, default: 0, methodName: 'rotate', group: 'base' },
+    )
+
+    // Visibility toggle action
+    actions.push({
+      name: 'base_toggleVisibility',
+      label: 'Toggle Visibility',
+      methodName: 'base_toggleVisibility',
+      group: 'base',
+    })
+
     // Derive name + category: prefer docblock, fall back to filename / class inspection
     const name = docblock?.name ?? id
     const category =

@@ -21,41 +21,20 @@ export function ModuleInfoBar() {
     }
   }, [])
 
-  const transition = `opacity ${config.infoFadeDuration}s ease`
-
   return (
     <div
+      className="fixed bottom-3 left-0 right-0 flex justify-between items-end px-4 z-5 pointer-events-none transition-opacity"
       style={{
-        position: 'fixed',
-        bottom: 12,
-        left: 0,
-        right: 0,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        padding: '0 16px',
-        zIndex: 5,
-        pointerEvents: 'none',
         opacity: visible ? 1 : 0,
-        transition,
+        transitionDuration: `${config.infoFadeDuration}s`,
       }}
     >
       {activeModule ? (
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
-          {activeModule.name}
-        </span>
+        <span className="text-xs text-white/70">{activeModule.name}</span>
       ) : <span />}
 
       {activeModule?.category ? (
-        <span
-          style={{
-            fontSize: 11,
-            color: '#fff',
-            background: 'rgba(0,0,0,0.75)',
-            padding: '3px 10px',
-            borderRadius: 6,
-          }}
-        >
+        <span className="text-[11px] text-white bg-black/75 px-2.5 py-0.5 rounded-md">
           {activeModule.category}
         </span>
       ) : <span />}

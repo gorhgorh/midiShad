@@ -1,5 +1,8 @@
 import type { OptionDescriptor } from '../types'
 import { useModuleStore } from '../store/moduleStore'
+import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
+import { IndexSlider } from './IndexSlider'
 
 interface OptionRowProps {
   option: OptionDescriptor
@@ -9,70 +12,52 @@ export function OptionRow({ option }: OptionRowProps) {
   const value = useModuleStore((s) => s.optionValues[option.name] ?? option.defaultVal)
   const setOptionValue = useModuleStore((s) => s.setOptionValue)
 
+  // Options with values array: use IndexSlider for MIDI-mappability
+  if (option.values && option.values.length > 0 && option.type === 'select') {
+    const currentIndex = option.values.indexOf(String(value))
+    return (
+      <div className="flex items-center gap-1.5 py-1">
+        <label className="w-[80px] shrink-0 text-xs text-white/70 truncate" title={option.label}>
+          {option.label}
+        </label>
+        <IndexSlider
+          values={option.values}
+          index={currentIndex >= 0 ? currentIndex : 0}
+          onChange={(idx) => setOptionValue(option.name, option.values![idx])}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0' }}>
-      <label style={{ width: 90, fontSize: 13, color: '#ccc' }}>{option.label}</label>
+    <div className="flex items-center gap-1.5 py-1">
+      <label className="w-[80px] shrink-0 text-xs text-muted-foreground truncate" title={option.label}>
+        {option.label}
+      </label>
 
       {option.type === 'color' && (
         <input
           type="color"
           value={String(value)}
           onChange={(e) => setOptionValue(option.name, e.target.value)}
-          style={{ width: 40, height: 26, border: '1px solid #555', borderRadius: 4, background: '#222', cursor: 'pointer' }}
+          className="w-8 h-6 border border-border rounded cursor-pointer bg-transparent"
         />
       )}
 
       {option.type === 'boolean' && (
-        <button
-          onClick={() => setOptionValue(option.name, !value)}
-          style={{
-            fontSize: 11,
-            padding: '2px 8px',
-            background: value ? '#1a5' : '#333',
-            color: '#fff',
-            border: value ? '1px solid #2d8' : '1px solid #555',
-            borderRadius: 4,
-            cursor: 'pointer',
-          }}
-        >
-          {value ? 'On' : 'Off'}
-        </button>
-      )}
-
-      {option.type === 'select' && option.values && (
-        <select
-          value={String(value)}
-          onChange={(e) => setOptionValue(option.name, e.target.value)}
-          style={{
-            background: '#222',
-            color: '#fff',
-            border: '1px solid #555',
-            borderRadius: 4,
-            padding: '2px 6px',
-            fontSize: 12,
-          }}
-        >
-          {option.values.map((v) => (
-            <option key={v} value={v}>{v}</option>
-          ))}
-        </select>
+        <Switch
+          checked={!!value}
+          onCheckedChange={(v) => setOptionValue(option.name, v)}
+        />
       )}
 
       {(option.type === 'text' || option.type === 'assetFile' || option.type === 'assetDir') && (
-        <input
+        <Input
           type="text"
           value={String(value)}
           onChange={(e) => setOptionValue(option.name, e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
-          style={{
-            flex: 1,
-            background: '#222',
-            color: '#fff',
-            border: '1px solid #555',
-            borderRadius: 4,
-            padding: '2px 6px',
-            fontSize: 12,
-          }}
+          className="h-6 text-xs flex-1"
         />
       )}
     </div>

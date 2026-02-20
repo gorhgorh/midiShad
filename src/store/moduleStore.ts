@@ -80,10 +80,24 @@ export const useModuleStore = create<ModuleState>((set, get) => ({
   },
 
   setParamValue: (name, value) =>
-    set((s) => ({ paramValues: { ...s.paramValues, [name]: value } })),
+    set((s) => {
+      const newParams = { ...s.paramValues, [name]: value }
+      const modId = s.activeModule?.id
+      return {
+        paramValues: newParams,
+        paramCache: modId ? { ...s.paramCache, [modId]: newParams } : s.paramCache,
+      }
+    }),
 
   setOptionValue: (name, value) =>
-    set((s) => ({ optionValues: { ...s.optionValues, [name]: value } })),
+    set((s) => {
+      const newOpts = { ...s.optionValues, [name]: value }
+      const modId = s.activeModule?.id
+      return {
+        optionValues: newOpts,
+        optionCache: modId ? { ...s.optionCache, [modId]: newOpts } : s.optionCache,
+      }
+    }),
 
   setCallAction: (fn) => set({ callAction: fn }),
 }))

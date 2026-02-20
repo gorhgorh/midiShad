@@ -1,22 +1,27 @@
-import { createRootRoute, Outlet, useNavigate, useLocation } from '@tanstack/react-router'
+import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { ModuleRenderer } from '../components/ModuleRenderer'
 import { ModuleInfoBar } from '../components/ModuleInfoBar'
+import { ModuleControlsPanel } from '../components/ModuleControlsPanel'
+import { AppSettingsDialog } from '../components/AppSettingsDialog'
 import { useMidi } from '../midi/useMidi'
 import { loadPersisted, setupPersistence } from '../store/persistence'
 import { useModuleStore } from '../store/moduleStore'
 import '../nwwrld/register'
 import { loadModules } from '../nwwrld/loader'
 
+const PANEL_STORAGE_KEY = 'midishad:panelOpen'
+
 export const Route = createRootRoute({
   component: RootLayout,
 })
 
 function RootLayout() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const isConfig = location.pathname === '/config'
   const [loading, setLoading] = useState(true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(() => {
+    try { return localStorage.getItem(PANEL_STORAGE_KEY) !== 'false' } catch { return true }
+  })
 
   // Load modules + persistence on mount
   const initRef = useRef(false)
@@ -34,13 +39,26 @@ function RootLayout() {
 
   useMidi()
 
+  // Persist panel open state
+  useEffect(() => {
+    localStorage.setItem(PANEL_STORAGE_KEY, String(panelOpen))
+  }, [panelOpen])
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        navigate({ to: isConfig ? '/' : '/config' })
+      // Ignore when typing in inputs
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        setPanelOpen((prev) => !prev)
       }
-      if (e.key === 'Escape' && isConfig) {
-        navigate({ to: '/' })
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setSettingsOpen((prev) => !prev)
+      }
+      if (e.key === 'Escape') {
+        if (settingsOpen) setSettingsOpen(false)
       }
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (document.fullscreenElement) {
@@ -52,11 +70,11 @@ function RootLayout() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isConfig, navigate])
+  }, [settingsOpen])
 
   if (loading) {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', fontSize: 14 }}>
+      <div className="fixed inset-0 bg-black flex items-center justify-center text-neutral-600 text-sm">
         Loading modules...
       </div>
     )
@@ -67,27 +85,8 @@ function RootLayout() {
       <ModuleRenderer />
       <ModuleInfoBar />
       <Outlet />
-      {!isConfig && (
-        <button
-          onClick={() => navigate({ to: '/config' })}
-          style={{
-            position: 'fixed',
-            bottom: 16,
-            right: 16,
-            zIndex: 20,
-            background: 'rgba(255,255,255,0.15)',
-            color: '#fff',
-            border: '1px solid rgba(255,255,255,0.25)',
-            borderRadius: 8,
-            padding: '6px 14px',
-            fontSize: 13,
-            cursor: 'pointer',
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          Config (c)
-        </button>
-      )}
+      <ModuleControlsPanel visible={panelOpen} />
+      <AppSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )
 }
