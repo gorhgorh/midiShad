@@ -6,6 +6,7 @@
 
 class ModelLoader extends BaseThreeJsModule {
   static methods = [
+    ...BaseThreeJsModule.methods,
     {
       name: "loadModel",
       executeOnLoad: true,
@@ -33,6 +34,15 @@ class ModelLoader extends BaseThreeJsModule {
         },
       ],
     },
+    {
+      name: "lighting",
+      executeOnLoad: false,
+      options: [
+        { name: "ambientIntensity", defaultVal: 0.7, type: "number", min: 0, max: 3 },
+        { name: "keyIntensity", defaultVal: 1.25, type: "number", min: 0, max: 5 },
+        { name: "fillIntensity", defaultVal: 0.5, type: "number", min: 0, max: 3 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -54,10 +64,20 @@ class ModelLoader extends BaseThreeJsModule {
     const fill = new THREE.DirectionalLight(0xffffff, 0.5);
     fill.position.set(-3, -1, 2);
 
+    this.ambientLight = ambient;
+    this.keyLight = key;
+    this.fillLight = fill;
+
     this.scene.add(ambient);
     this.scene.add(key);
     this.scene.add(fill);
     this.lights.push(ambient, key, fill);
+  }
+
+  lighting({ ambientIntensity = 0.7, keyIntensity = 1.25, fillIntensity = 0.5 } = {}) {
+    if (this.ambientLight) this.ambientLight.intensity = Number(ambientIntensity) || 0.7;
+    if (this.keyLight) this.keyLight.intensity = Number(keyIntensity) || 1.25;
+    if (this.fillLight) this.fillLight.intensity = Number(fillIntensity) || 0.5;
   }
 
   getExtension(modelPath) {

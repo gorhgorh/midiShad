@@ -17,6 +17,15 @@ class ZKProofVisualizer extends ModuleBase {
         },
       ],
     },
+    {
+      name: "style",
+      options: [
+        { name: "swapInterval", defaultVal: 20, type: "number", min: 5, max: 200 },
+        { name: "matchColor1", defaultVal: "#ffff00", type: "color" },
+        { name: "matchColor2", defaultVal: "#ff0000", type: "color" },
+        { name: "fontSize", defaultVal: 8, type: "number", min: 4, max: 24 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -27,6 +36,10 @@ class ZKProofVisualizer extends ModuleBase {
     this.pairs = new Map();
     this.isAnimating = false;
     this.lastSwapTime = 0;
+    this.swapInterval = 20;
+    this.matchColor1 = "yellow";
+    this.matchColor2 = "red";
+    this.fontSize = 8;
 
     this.init();
   }
@@ -134,7 +147,7 @@ class ZKProofVisualizer extends ModuleBase {
     const swapWords = () => {
       const currentTime = performance.now();
 
-      if (currentTime - this.lastSwapTime >= 20) {
+      if (currentTime - this.lastSwapTime >= this.swapInterval) {
         this.columns.forEach((column) => {
           for (let i = 0; i < 5; i++) {
             const words = Array.from(column.children);
@@ -200,8 +213,8 @@ class ZKProofVisualizer extends ModuleBase {
     }
 
     matches.forEach(([word1, word2]) => {
-      word1.style.background = "yellow";
-      word2.style.background = "red";
+      word1.style.background = this.matchColor1;
+      word2.style.background = this.matchColor2;
     });
 
     setTimeout(() => {
@@ -210,6 +223,15 @@ class ZKProofVisualizer extends ModuleBase {
         word2.style.background = "transparent";
       });
     }, 75);
+  }
+
+  style({ swapInterval = 20, matchColor1 = "#ffff00", matchColor2 = "#ff0000", fontSize = 8 } = {}) {
+    this.swapInterval = swapInterval;
+    this.matchColor1 = matchColor1;
+    this.matchColor2 = matchColor2;
+    this.fontSize = fontSize;
+    const container = this.elem.querySelector(".font-monospace");
+    if (container) container.style.fontSize = this.fontSize + "px";
   }
 
   destroy() {

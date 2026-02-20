@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
 import type { ParamDescriptor } from '../types'
 import { useModuleStore } from '../store/moduleStore'
 import { useMidiStore } from '../store/midiStore'
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DIVIDER_OPTIONS } from '@/lfo/engine'
 
 const LFO_COLORS: Record<LfoSlotId, string> = {
   lfo1: '#6ee7b7',
@@ -28,7 +30,7 @@ interface ParamRowProps {
 }
 
 export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
-  const value = useModuleStore((s) => s.paramValues[param.name] ?? param.default)
+  const modulatedValue = useModuleStore((s) => s.paramValues[param.name] ?? param.default)
   const setParamValue = useModuleStore((s) => s.setParamValue)
   const learnTarget = useMidiStore((s) => s.learnTarget)
   const setLearnTarget = useMidiStore((s) => s.setLearnTarget)
@@ -39,6 +41,14 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
   const lfoAssignment = useLfoStore((s) => s.assignments[param.name] ?? null)
   const assignParam = useLfoStore((s) => s.assignParam)
   const setBaseValue = useLfoStore((s) => s.setBaseValue)
+  const baseValue = useLfoStore((s) => s.baseValues[param.name] ?? param.default)
+  const assignStrength = useLfoStore((s) => s.assignmentStrengths[param.name] ?? 0.5)
+  const setAssignmentStrength = useLfoStore((s) => s.setAssignmentStrength)
+  const assignDivider = useLfoStore((s) => s.assignmentDividers[param.name] ?? 1)
+  const setAssignmentDivider = useLfoStore((s) => s.setAssignmentDivider)
+
+  // When LFO assigned: slider shows/controls the base (offset) value, display shows modulated output
+  const value = lfoAssignment ? baseValue : modulatedValue
   const isLearning = learnTarget === param.name
 
   const [editing, setEditing] = useState(false)
@@ -90,6 +100,7 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
   const hasCc = ccNumber != null
 
   return (
+    <div>
     <div className="flex items-center gap-1.5 py-1">
       <label className="w-[80px] shrink-0 text-xs text-white/70 truncate" title={param.label}>
         {param.label}
@@ -102,8 +113,12 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
         onValueChange={onSliderChange}
         className="flex-1"
       />
-      <span className="w-[38px] text-[10px] text-white/70 text-right tabular-nums">
-        {value.toFixed(1)}
+      <span
+        className="w-[38px] text-[10px] text-right tabular-nums"
+        style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment] } : { color: 'rgba(255,255,255,0.7)' }}
+        title={lfoAssignment ? `Base: ${baseValue.toFixed(1)}` : undefined}
+      >
+        {modulatedValue.toFixed(1)}
       </span>
 
       {editing ? (
@@ -183,6 +198,51 @@ export function ParamRow({ param, ccNumber, isRelative }: ParamRowProps) {
           </Select>
         </div>
       )}
+    </div>
+    <AnimatePresence>
+      {lfoAssignment && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+          style={{ overflow: 'hidden' }}
+        >
+          <div className="flex items-center gap-1.5 py-0.5 pl-[80px]">
+            <span className="text-[9px] text-white/40 shrink-0 w-[32px]">Str</span>
+            <Slider
+              min={0}
+              max={1}
+              step={0.01}
+              value={[assignStrength]}
+              onValueChange={([v]) => setAssignmentStrength(param.name, v)}
+              className="flex-1"
+            />
+            <span className="w-[28px] text-[9px] text-white/40 text-right tabular-nums">
+              {assignStrength.toFixed(2)}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 py-0.5 pl-[80px]">
+            <span className="text-[9px] text-white/40 shrink-0 w-[32px]">Div</span>
+            <div className="flex flex-wrap gap-0.5 flex-1">
+              {DIVIDER_OPTIONS.map((d) => (
+                <Button
+                  key={d.value}
+                  variant="outline"
+                  size="sm"
+                  className={`h-4 px-1 text-[8px] min-w-0 ${assignDivider === d.value
+                    ? 'bg-white/15 text-white border-white/20'
+                    : 'bg-black text-white/50 border-white/10 hover:bg-white/10 hover:text-white'}`}
+                  onClick={() => setAssignmentDivider(param.name, d.value)}
+                >
+                  {d.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     </div>
   )
 }

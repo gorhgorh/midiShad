@@ -4,7 +4,7 @@ import { computeLfosInOrder } from '@/lfo/graph'
 import { useLfoStore, type LfoSlotId } from '@/store/lfoStore'
 import { useClockStore } from '@/store/clockStore'
 
-const MODULABLE_PARAMS: LfoParamName[] = ['strength', 'hz', 'drive', 'symmetry']
+const MODULABLE_PARAMS: LfoParamName[] = ['hz', 'drive', 'symmetry']
 
 interface LfoWavePreviewProps {
   lfoId: LfoSlotId
@@ -90,9 +90,9 @@ export function LfoWavePreview({ lfoId, color = '#6ee7b7' }: LfoWavePreviewProps
 
         let val: number
         if (lfo.bipolar) {
-          val = raw * lfo.strength
+          val = raw
         } else {
-          val = ((raw + 1) / 2) * lfo.strength
+          val = (raw + 1) / 2
         }
 
         const x = (i / steps) * w

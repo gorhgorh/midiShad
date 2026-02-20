@@ -11,6 +11,7 @@ const sample = (arr) => {
 
 class CubeCube extends BaseThreeJsModule {
   static methods = [
+    ...BaseThreeJsModule.methods,
     {
       name: "appendCube",
       executeOnLoad: false,
@@ -28,12 +29,20 @@ class CubeCube extends BaseThreeJsModule {
       executeOnLoad: false,
       options: [],
     },
+    {
+      name: "style",
+      executeOnLoad: false,
+      options: [
+        { name: "rotationSpeed", defaultVal: 0.001, type: "number", min: 0, max: 0.01 },
+      ],
+    },
   ];
 
   constructor(container) {
     super(container);
 
     this.name = CubeCube.name;
+    this.rotSpeed = 0.001;
     this.cubeGroup = new THREE.Group();
     this.cubeSize = 1;
     this.cubeGrid = [];
@@ -163,8 +172,8 @@ class CubeCube extends BaseThreeJsModule {
 
   animateLoop() {
     if (this.destroyed) return;
-    this.cubeGroup.rotation.x += 0.001;
-    this.cubeGroup.rotation.y += 0.001;
+    this.cubeGroup.rotation.x += this.rotSpeed;
+    this.cubeGroup.rotation.y += this.rotSpeed;
 
     this.hexagons.forEach((hexagon) => {
       hexagon.rotation.z += 0.05;
@@ -227,6 +236,10 @@ class CubeCube extends BaseThreeJsModule {
         }, duration * 1000);
       }
     }
+  }
+
+  style({ rotationSpeed = 0.001 } = {}) {
+    this.rotSpeed = Number(rotationSpeed) || 0.001;
   }
 
   resetCubes() {

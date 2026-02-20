@@ -5,16 +5,29 @@
 */
 
 class OrbitalPlane extends ModuleBase {
-  static methods = [];
+  static methods = [
+    {
+      name: "style",
+      options: [
+        { name: "speedMultiplier", defaultVal: 1, type: "number", min: 0.1, max: 5 },
+        { name: "orbitWeight", defaultVal: 1, type: "number", min: 0.5, max: 5 },
+        { name: "pointWeight", defaultVal: 3, type: "number", min: 1, max: 10 },
+      ],
+    },
+  ];
 
   constructor(container) {
     super(container);
     this.name = OrbitalPlane.name;
     this.myp5 = null;
+    this.speedMul = 1;
+    this.orbitWeight = 1;
+    this.pointWeight = 3;
     this.init();
   }
 
   init() {
+    const self = this;
     const sketch = (p) => {
       this.myp5 = p;
 
@@ -53,9 +66,9 @@ class OrbitalPlane extends ModuleBase {
         p.translate(this.canvasWidth / 2, this.canvasHeight / 2);
         this.orbits.forEach((orbit) => {
           p.stroke(orbit.color);
-          p.strokeWeight(1);
+          p.strokeWeight(self.orbitWeight);
           p.ellipse(orbit.offset.x, orbit.offset.y, orbit.radius * 2);
-          p.strokeWeight(3);
+          p.strokeWeight(self.pointWeight);
           orbit.points.forEach((angle) => {
             let x = orbit.radius * p.cos(p.radians(angle)) + orbit.offset.x;
             let y = orbit.radius * p.sin(p.radians(angle)) + orbit.offset.y;
@@ -68,16 +81,22 @@ class OrbitalPlane extends ModuleBase {
             p.point(x, y);
           });
           orbit.points = orbit.points.map(
-            (angle) => (angle + orbit.rotationSpeed) % 360
+            (angle) => (angle + orbit.rotationSpeed * self.speedMul) % 360
           );
           orbit.extraPoints = orbit.extraPoints.map(
-            (angle) => (angle + orbit.rotationSpeed) % 360
+            (angle) => (angle + orbit.rotationSpeed * self.speedMul) % 360
           );
         });
       };
     };
 
     this.myp5 = new p5(sketch);
+  }
+
+  style({ speedMultiplier = 1, orbitWeight = 1, pointWeight = 3 } = {}) {
+    this.speedMul = speedMultiplier;
+    this.orbitWeight = orbitWeight;
+    this.pointWeight = pointWeight;
   }
 
   destroy() {

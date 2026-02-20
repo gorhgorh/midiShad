@@ -45,6 +45,16 @@ class Frame extends ModuleBase {
       name: "randomize",
       executeOnLoad: false,
     },
+    {
+      name: "style",
+      executeOnLoad: true,
+      options: [
+        { name: "axisColor", defaultVal: "#ff0000", type: "color" },
+        { name: "textColor", defaultVal: "#ffffff", type: "color" },
+        { name: "markerCount", defaultVal: 30, type: "number", min: 5, max: 100 },
+        { name: "lineWidth", defaultVal: 1, type: "number", min: 0.5, max: 5 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -56,6 +66,10 @@ class Frame extends ModuleBase {
       top: false,
       bottom: false,
     };
+    this.axisColor = "red";
+    this.textColor = "white";
+    this.markerCount = 30;
+    this.lineWidth = 1;
     this.init();
   }
 
@@ -76,10 +90,10 @@ class Frame extends ModuleBase {
 
   drawFrame() {
     const padding = 10;
-    const axisColor = "red";
-    const textColor = "white";
-    const lineWidth = 1;
-    const numberOfMarkers = 30;
+    const axisColor = this.axisColor;
+    const textColor = this.textColor;
+    const lineWidth = this.lineWidth;
+    const numberOfMarkers = this.markerCount;
     const fontSize = 6;
 
     let paddingLeft = padding;
@@ -244,6 +258,14 @@ class Frame extends ModuleBase {
 
   randomise(options = {}) {
     return this.randomize(options);
+  }
+
+  style({ axisColor = "#ff0000", textColor = "#ffffff", markerCount = 30, lineWidth = 1 } = {}) {
+    this.axisColor = axisColor;
+    this.textColor = textColor;
+    this.markerCount = markerCount;
+    this.lineWidth = lineWidth;
+    this.randomize();
   }
 
   destroy() {

@@ -117,21 +117,23 @@ export function computeLfosInOrder(
   bpm: number,
   timeSec: number,
   ccValues: Record<number, number>,
-): Record<LfoSlotId, number> {
+): { outputs: Record<LfoSlotId, number>; effectives: Record<LfoSlotId, LfoDefinition> } {
   const order = topoSortLfos(mods)
   const outputs: Record<string, number> = {}
+  const effectives: Record<string, LfoDefinition> = {}
 
   for (const lfoId of order) {
     const baseLfo = lfos[lfoId]
     if (!baseLfo) {
       outputs[lfoId] = 0
+      effectives[lfoId] = baseLfo
       continue
     }
 
     // Build effective LFO definition by applying modulations to params
     const effective = { ...baseLfo }
 
-    const modulableParams: LfoParamName[] = ['strength', 'hz', 'drive', 'symmetry']
+    const modulableParams: LfoParamName[] = ['hz', 'drive', 'symmetry']
     for (const param of modulableParams) {
       const modKey = `${lfoId}.${param}`
       const mod = mods[modKey]
@@ -152,8 +154,12 @@ export function computeLfosInOrder(
       }
     }
 
+    effectives[lfoId] = effective
     outputs[lfoId] = computeLfo(effective, bpm, timeSec, lfoId)
   }
 
-  return outputs as Record<LfoSlotId, number>
+  return {
+    outputs: outputs as Record<LfoSlotId, number>,
+    effectives: effectives as Record<LfoSlotId, LfoDefinition>,
+  }
 }

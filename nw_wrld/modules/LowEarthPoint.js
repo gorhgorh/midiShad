@@ -110,6 +110,7 @@ const createQuadraticBezierLineSegments = ({
 
 class LowEarthPointModule extends BaseThreeJsModule {
   static methods = [
+    ...BaseThreeJsModule.methods,
     {
       name: "primary",
       executeOnLoad: false,
@@ -122,6 +123,14 @@ class LowEarthPointModule extends BaseThreeJsModule {
         },
       ],
     },
+    {
+      name: "style",
+      executeOnLoad: false,
+      options: [
+        { name: "pointSize", defaultVal: 0.05, type: "number", min: 0.01, max: 0.5 },
+        { name: "rotationSpeed", defaultVal: 1, type: "number", min: 0, max: 5 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -129,6 +138,8 @@ class LowEarthPointModule extends BaseThreeJsModule {
     if (!THREE) return;
 
     this.name = LowEarthPointModule.name;
+    this.pointSize = 0.05;
+    this.rotSpeed = 1;
     this.customGroup = new THREE.Group();
     this.customObjects = [];
     this.points = [];
@@ -159,7 +170,7 @@ class LowEarthPointModule extends BaseThreeJsModule {
     const geometry = new THREE.BufferGeometry();
     const material = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.05,
+      size: this.pointSize,
     });
     const positions = [];
 
@@ -188,7 +199,7 @@ class LowEarthPointModule extends BaseThreeJsModule {
     const redGeometry = new THREE.BufferGeometry();
     const redMaterial = new THREE.PointsMaterial({
       color: 0xff0000,
-      size: 0.045,
+      size: this.pointSize * 0.9,
     });
     const redPositions = [];
 
@@ -253,20 +264,27 @@ class LowEarthPointModule extends BaseThreeJsModule {
     if (this.destroyed) return;
 
     if (this.pointCloud) {
-      this.pointCloud.rotation.x += 0.0005 * this.cameraSettings.cameraSpeed;
-      this.pointCloud.rotation.y += 0.0005 * this.cameraSettings.cameraSpeed;
+      this.pointCloud.rotation.x += 0.0005 * this.rotSpeed * this.cameraSettings.cameraSpeed;
+      this.pointCloud.rotation.y += 0.0005 * this.rotSpeed * this.cameraSettings.cameraSpeed;
     }
 
     if (this.redPointCloud) {
-      this.redPointCloud.rotation.x += 0.0003 * this.cameraSettings.cameraSpeed;
-      this.redPointCloud.rotation.y += 0.0003 * this.cameraSettings.cameraSpeed;
+      this.redPointCloud.rotation.x += 0.0003 * this.rotSpeed * this.cameraSettings.cameraSpeed;
+      this.redPointCloud.rotation.y += 0.0003 * this.rotSpeed * this.cameraSettings.cameraSpeed;
     }
 
-    this.linesGroup.rotation.x += 0.0003 * this.cameraSettings.cameraSpeed;
-    this.linesGroup.rotation.y += 0.0003 * this.cameraSettings.cameraSpeed;
+    this.linesGroup.rotation.x += 0.0003 * this.rotSpeed * this.cameraSettings.cameraSpeed;
+    this.linesGroup.rotation.y += 0.0003 * this.rotSpeed * this.cameraSettings.cameraSpeed;
 
-    this.redLinesGroup.rotation.x += 0.0003 * this.cameraSettings.cameraSpeed;
-    this.redLinesGroup.rotation.y += 0.0003 * this.cameraSettings.cameraSpeed;
+    this.redLinesGroup.rotation.x += 0.0003 * this.rotSpeed * this.cameraSettings.cameraSpeed;
+    this.redLinesGroup.rotation.y += 0.0003 * this.rotSpeed * this.cameraSettings.cameraSpeed;
+  }
+
+  style({ pointSize = 0.05, rotationSpeed = 1 } = {}) {
+    this.pointSize = Number(pointSize) || 0.05;
+    this.rotSpeed = Number(rotationSpeed) || 1;
+    if (this.pointCloud) this.pointCloud.material.size = this.pointSize;
+    if (this.redPointCloud) this.redPointCloud.material.size = this.pointSize * 0.9;
   }
 
   primary({ duration } = {}) {

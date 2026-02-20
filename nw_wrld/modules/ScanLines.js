@@ -53,6 +53,13 @@ class ScanLines extends ModuleBase {
       executeOnLoad: false,
       options: [],
     },
+    {
+      name: "lineStyle",
+      executeOnLoad: true,
+      options: [
+        { name: "lineWidth", defaultVal: 2, type: "number", min: 0.5, max: 10 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -65,6 +72,7 @@ class ScanLines extends ModuleBase {
     this.animationFrameId = null;
     this.defaultColor = "#ffffff";
     this.paused = false;
+    this.lineWidth = 2;
     this.boundResize = null;
     this.destroyed = false;
 
@@ -128,6 +136,10 @@ class ScanLines extends ModuleBase {
     this.paused = false;
   }
 
+  lineStyle({ lineWidth = 2 } = {}) {
+    this.lineWidth = lineWidth;
+  }
+
   animate() {
     if (this.destroyed) return;
 
@@ -158,7 +170,7 @@ class ScanLines extends ModuleBase {
     this.scanLines.forEach((line) => {
       this.ctx.beginPath();
       this.ctx.strokeStyle = line.color;
-      this.ctx.lineWidth = 2;
+      this.ctx.lineWidth = this.lineWidth;
 
       if (line.direction === "vertical") {
         this.ctx.moveTo(line.position, 0);

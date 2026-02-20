@@ -24,6 +24,14 @@ class GridDots extends ModuleBase {
       executeOnLoad: true,
       options: [{ name: "color", defaultVal: "#ffffff", type: "color" }],
     },
+    {
+      name: "style",
+      executeOnLoad: true,
+      options: [
+        { name: "opacity", defaultVal: 0.5, type: "number", min: 0, max: 1 },
+        { name: "dotSize", defaultVal: 2, type: "number", min: 0.5, max: 10 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -33,6 +41,8 @@ class GridDots extends ModuleBase {
     this.x = 10;
     this.y = 10;
     this.dotColor = "#ffffff";
+    this.opacity = 0.5;
+    this.dotSize = 2;
     this.init();
   }
 
@@ -50,13 +60,13 @@ class GridDots extends ModuleBase {
     this.gridElem.width = this.elem.clientWidth;
     this.gridElem.height = this.elem.clientHeight;
     const ctx = this.gridElem.getContext("2d");
-    this.elem.style.opacity = 0.5;
+    this.elem.style.opacity = this.opacity;
 
     ctx.fillStyle = this.dotColor;
 
     const cellWidth = this.gridElem.width / this.x;
     const cellHeight = this.gridElem.height / this.y;
-    const dotSize = 2;
+    const dotSize = this.dotSize;
 
     for (let i = 0; i <= this.x; i++) {
       for (let j = 0; j <= this.y; j++) {
@@ -79,6 +89,12 @@ class GridDots extends ModuleBase {
 
   color({ color = "#ffffff" } = {}) {
     this.dotColor = color;
+    this.createGridDots();
+  }
+
+  style({ opacity = 0.5, dotSize = 2 } = {}) {
+    this.opacity = opacity;
+    this.dotSize = dotSize;
     this.createGridDots();
   }
 

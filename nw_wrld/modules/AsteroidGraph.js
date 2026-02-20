@@ -36,6 +36,13 @@ class AsteroidGraph extends ModuleBase {
         },
       ],
     },
+    {
+      name: "style",
+      options: [
+        { name: "noiseSpeed", defaultVal: 0.01, type: "number", min: 0.001, max: 0.05 },
+        { name: "labelSize", defaultVal: 12, type: "number", min: 6, max: 24 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -44,11 +51,14 @@ class AsteroidGraph extends ModuleBase {
     this.meteors = [];
     this.dataset = null;
     this.myp5 = null;
+    this.noiseSpeed = 0.01;
+    this.labelSize = 12;
     this.init();
   }
 
   init() {
     if (!p5) return;
+    const self = this;
     const sketch = (p) => {
       this.myp5 = p;
       let noiseOffsetX = 0.0;
@@ -61,12 +71,13 @@ class AsteroidGraph extends ModuleBase {
         this.canvas = p.createCanvas(canvasWidth, canvasHeight);
         this.canvas.parent(this.elem);
 
-        p.textSize(12);
+        p.textSize(self.labelSize);
         p.textAlign(p.CENTER, p.CENTER);
       };
 
       p.draw = () => {
         p.clear();
+        p.textSize(self.labelSize);
         const centerY = p.height / 2;
         let maxDistortion = (p.height / 2) * 0.9;
 
@@ -115,8 +126,8 @@ class AsteroidGraph extends ModuleBase {
           }
         });
 
-        noiseOffsetX += 0.01;
-        noiseOffsetY += 0.01;
+        noiseOffsetX += self.noiseSpeed;
+        noiseOffsetY += self.noiseSpeed;
       };
     };
 
@@ -154,6 +165,11 @@ class AsteroidGraph extends ModuleBase {
     for (let i = 0; i < safeCount; i++) {
       this.meteors.push(makeRandomMeteor());
     }
+  }
+
+  style({ noiseSpeed = 0.01, labelSize = 12 } = {}) {
+    this.noiseSpeed = noiseSpeed;
+    this.labelSize = labelSize;
   }
 
   destroy() {

@@ -1,6 +1,5 @@
 import { FloatingPanel } from './FloatingPanel'
 import { ParamMappingList } from './ParamMappingList'
-import { LfoPanel } from './LfoPanel'
 import { useModuleStore } from '@/store/moduleStore'
 import {
   Popover,
@@ -49,7 +48,6 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
   const setActiveModule = useModuleStore((s) => s.setActiveModule)
   const [moduleOpen, setModuleOpen] = useState(true)
   const [transformOpen, setTransformOpen] = useState(true)
-  const [lfoOpen, setLfoOpen] = useState(false)
   const [listOpen, setListOpen] = useState(false)
 
   // Flat list for prev/next cycling
@@ -173,13 +171,6 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
           </Collapsible>
         )}
 
-        {/* LFO section */}
-        <Collapsible open={lfoOpen} onOpenChange={setLfoOpen}>
-          <SectionHeader label="LFO" open={lfoOpen} onToggle={() => setLfoOpen(!lfoOpen)} onReset={resetAllLfos} />
-          <CollapsibleContent className="pt-3 px-0.5">
-            <LfoPanel />
-          </CollapsibleContent>
-        </Collapsible>
       </div>
     </FloatingPanel>
   )

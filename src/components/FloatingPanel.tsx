@@ -1,27 +1,29 @@
 import { useRef, useCallback, useState, type ReactNode } from 'react'
 
-const STORAGE_KEY = 'midishad:panelPos'
-
 interface FloatingPanelProps {
   children: ReactNode
   visible: boolean
+  storageKey?: string
+  defaultPosition?: { x: number; y: number }
 }
 
-function loadPosition(): { x: number; y: number } {
+function loadPosition(key: string, fallback: { x: number; y: number }): { x: number; y: number } {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(key)
     if (raw) return JSON.parse(raw)
   } catch { /* ignore */ }
-  return { x: window.innerWidth - 380, y: 60 }
+  return fallback
 }
 
-function savePosition(x: number, y: number) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ x, y }))
+function savePosition(key: string, x: number, y: number) {
+  localStorage.setItem(key, JSON.stringify({ x, y }))
 }
 
-export function FloatingPanel({ children, visible }: FloatingPanelProps) {
+export function FloatingPanel({ children, visible, storageKey = 'midishad:panelPos', defaultPosition }: FloatingPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
-  const [position, setPosition] = useState(loadPosition())
+  const [position, setPosition] = useState(() =>
+    loadPosition(storageKey, defaultPosition ?? { x: window.innerWidth - 380, y: 60 })
+  )
   const dragging = useRef(false)
   const offset = useRef({ x: 0, y: 0 })
   const lastPos = useRef({ x: 0, y: 0 })
@@ -47,7 +49,7 @@ export function FloatingPanel({ children, visible }: FloatingPanelProps) {
     function onMouseUp() {
       dragging.current = false
       setPosition(lastPos.current)
-      savePosition(lastPos.current.x, lastPos.current.y)
+      savePosition(storageKey, lastPos.current.x, lastPos.current.y)
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }

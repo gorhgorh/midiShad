@@ -9,6 +9,10 @@ interface LfoState {
   lfos: Record<LfoSlotId, LfoDefinition>
   /** paramName → lfoSlotId or null */
   assignments: Record<string, LfoSlotId | null>
+  /** Per-assignment strength (0-1), keyed by param name */
+  assignmentStrengths: Record<string, number>
+  /** Per-assignment divider multiplier, keyed by param name (default 1) */
+  assignmentDividers: Record<string, number>
   /** Base values (what the user set via slider) per param, separate from LFO-modulated display values */
   baseValues: Record<string, number>
 
@@ -22,13 +26,11 @@ interface LfoState {
   /** Latest CC values from MIDI, keyed by CC number */
   ccValues: Record<number, number>
 
-  /** Whether to show the 4-square LFO overlay in top-left */
-  showLfoOverlay: boolean
-  toggleLfoOverlay: () => void
-
   setLfo: (id: LfoSlotId, partial: Partial<LfoDefinition>) => void
   assignParam: (paramName: string, lfoId: LfoSlotId | null) => void
   setBaseValue: (paramName: string, value: number) => void
+  setAssignmentStrength: (paramName: string, value: number) => void
+  setAssignmentDivider: (paramName: string, value: number) => void
 
   /** Set modulation source for an LFO parameter. Returns false if it would create a cycle. */
   setLfoParamMod: (lfoId: LfoSlotId, param: LfoParamName, source: LfoParamModSource | null) => boolean
@@ -52,14 +54,13 @@ export const useLfoStore = create<LfoState>((set, get) => ({
     lfo4: createDefaultLfo(),
   },
   assignments: {},
+  assignmentStrengths: {},
+  assignmentDividers: {},
   baseValues: {},
   lfoParamMods: {},
   lfoParamBaseValues: {},
   lfoLearnTarget: null,
   ccValues: {},
-  showLfoOverlay: false,
-  toggleLfoOverlay: () => set((s) => ({ showLfoOverlay: !s.showLfoOverlay })),
-
   setLfo: (id, partial) =>
     set((s) => ({
       lfos: { ...s.lfos, [id]: { ...s.lfos[id], ...partial } },
@@ -73,6 +74,16 @@ export const useLfoStore = create<LfoState>((set, get) => ({
   setBaseValue: (paramName, value) =>
     set((s) => ({
       baseValues: { ...s.baseValues, [paramName]: value },
+    })),
+
+  setAssignmentStrength: (paramName, value) =>
+    set((s) => ({
+      assignmentStrengths: { ...s.assignmentStrengths, [paramName]: value },
+    })),
+
+  setAssignmentDivider: (paramName, value) =>
+    set((s) => ({
+      assignmentDividers: { ...s.assignmentDividers, [paramName]: value },
     })),
 
   setLfoParamMod: (lfoId, param, source) => {
@@ -130,6 +141,8 @@ export const useLfoStore = create<LfoState>((set, get) => ({
         lfo4: createDefaultLfo(),
       },
       assignments: {},
+      assignmentStrengths: {},
+      assignmentDividers: {},
       baseValues: {},
       lfoParamMods: {},
       lfoParamBaseValues: {},

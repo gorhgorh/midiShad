@@ -1,11 +1,26 @@
-export type LfoShape = 'sine' | 'triangle' | 'square' | 'sawtooth' | 'noise'
+export type LfoShape = 'sine' | 'triangle' | 'square' | 'sawtooth' | 'noise' | 'perlin'
 export type SpeedMode = 'bpm' | 'hz'
-export type Divider = 0.25 | 0.5 | 1 | 2 | 4
+export type Divider = number
 
-export type LfoParamName = 'strength' | 'hz' | 'drive' | 'symmetry'
+export const DIVIDER_OPTIONS: { value: number; label: string }[] = [
+  { value: 1/16, label: '1/16' },
+  { value: 1/8, label: '1/8' },
+  { value: 1/4, label: '1/4' },
+  { value: 1/3, label: '1/3' },
+  { value: 1/2, label: '1/2' },
+  { value: 2/3, label: '2/3' },
+  { value: 1, label: '1' },
+  { value: 3/2, label: '3/2' },
+  { value: 2, label: '2' },
+  { value: 3, label: '3' },
+  { value: 4, label: '4' },
+  { value: 8, label: '8' },
+  { value: 16, label: '16' },
+]
+
+export type LfoParamName = 'hz' | 'drive' | 'symmetry'
 
 export const LFO_PARAM_RANGES: Record<LfoParamName, { min: number; max: number; step: number }> = {
-  strength: { min: 0, max: 1, step: 0.01 },
   hz: { min: 0.01, max: 20, step: 0.01 },
   drive: { min: 0, max: 1, step: 0.01 },
   symmetry: { min: 0, max: 1, step: 0.01 },
@@ -13,7 +28,6 @@ export const LFO_PARAM_RANGES: Record<LfoParamName, { min: number; max: number; 
 
 export interface LfoDefinition {
   shape: LfoShape
-  strength: number  // 0–1
   bipolar: boolean
   speedMode: SpeedMode
   hz: number
@@ -73,6 +87,21 @@ function sampleRandomNoise(phase: number, lfoId: string): number {
   return state.value
 }
 
+/** 1D Perlin noise: smooth continuous random in ~[-1, 1] */
+function perlinHash(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453123
+  return (x - Math.floor(x)) * 2 - 1
+}
+
+function perlinNoise(x: number): number {
+  const xi = Math.floor(x)
+  const xf = x - xi
+  const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10) // quintic smoothstep
+  const d0 = perlinHash(xi) * xf
+  const d1 = perlinHash(xi + 1) * (xf - 1)
+  return Math.max(-1, Math.min(1, (d0 + u * (d1 - d0)) * 2))
+}
+
 /** Ramp wave: symmetry=0→ramp up, 0.5→triangle, 1→ramp down */
 function rampWave(p: number, sym: number): number {
   // Clamp sym to avoid division by zero
@@ -114,6 +143,9 @@ export function shapedWave(shape: LfoShape, phase: number, drive: number, symmet
     case 'noise':
       raw = randomFreq ? sampleRandomNoise(phase, lfoId) : sampleNoise(phase, lfoId)
       break
+    case 'perlin':
+      raw = perlinNoise(phase)
+      break
   }
   return applyDrive(raw, drive)
 }
@@ -124,29 +156,28 @@ export function shapedWave(shape: LfoShape, phase: number, drive: number, symmet
  * - bipolar: returns [-strength, +strength] centered around 0
  * - unipolar: returns [0, strength] range
  */
-export function computeLfo(lfo: LfoDefinition, bpm: number, timeSec: number, lfoId = '_default'): number {
+export function computeLfo(lfo: LfoDefinition, bpm: number, timeSec: number, lfoId = '_default', phaseMul = 1): number {
   // Calculate phase based on speed mode
   let phase: number
   if (lfo.speedMode === 'hz') {
-    phase = timeSec * lfo.hz
+    phase = timeSec * lfo.hz * phaseMul
   } else {
-    // BPM mode: phase = time * (bpm/60) * divider
-    phase = timeSec * (bpm / 60) * lfo.divider
+    // BPM mode: phase = time * (bpm/60) * divider * phaseMul
+    phase = timeSec * (bpm / 60) * lfo.divider * phaseMul
   }
 
   const raw = shapedWave(lfo.shape, phase, lfo.drive, lfo.symmetry, lfoId, lfo.randomFreq)  // -1 to 1
 
   if (lfo.bipolar) {
-    return raw * lfo.strength
+    return raw  // [-1, 1]
   } else {
-    return ((raw + 1) / 2) * lfo.strength
+    return (raw + 1) / 2  // [0, 1]
   }
 }
 
 export function createDefaultLfo(): LfoDefinition {
   return {
     shape: 'sine',
-    strength: 0.5,
     bipolar: false,
     speedMode: 'bpm',
     hz: 1,

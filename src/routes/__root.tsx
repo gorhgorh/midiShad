@@ -1,11 +1,11 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
-import { Settings, Component } from 'lucide-react'
+import { Settings, Component, AudioWaveform } from 'lucide-react'
 import { ModuleRenderer } from '../components/ModuleRenderer'
 import { ModuleInfoBar } from '../components/ModuleInfoBar'
 import { ModuleControlsPanel } from '../components/ModuleControlsPanel'
 import { AppSettingsDialog } from '../components/AppSettingsDialog'
-import { LfoOverlay } from '../components/LfoOverlay'
+import { LfoWindow } from '../components/LfoWindow'
 import { useMidi } from '../midi/useMidi'
 import { loadPersisted, setupPersistence } from '../store/persistence'
 import { useModuleStore } from '../store/moduleStore'
@@ -14,6 +14,7 @@ import '../nwwrld/register'
 import { loadModules, toKebab } from '../nwwrld/loader'
 
 const PANEL_STORAGE_KEY = 'midishad:panelOpen'
+const LFO_PANEL_STORAGE_KEY = 'midishad:lfoPanelOpen'
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -24,6 +25,9 @@ function RootLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [panelOpen, setPanelOpen] = useState(() => {
     try { return localStorage.getItem(PANEL_STORAGE_KEY) !== 'false' } catch { return true }
+  })
+  const [lfoOpen, setLfoOpen] = useState(() => {
+    try { return localStorage.getItem(LFO_PANEL_STORAGE_KEY) === 'true' } catch { return false }
   })
   const scale = useUiStore((s) => s.scale)
 
@@ -63,6 +67,10 @@ function RootLayout() {
   }, [panelOpen])
 
   useEffect(() => {
+    localStorage.setItem(LFO_PANEL_STORAGE_KEY, String(lfoOpen))
+  }, [lfoOpen])
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       // Ignore when typing in inputs
       const tag = (e.target as HTMLElement)?.tagName
@@ -74,6 +82,9 @@ function RootLayout() {
       }
       if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         setSettingsOpen((prev) => !prev)
+      }
+      if (e.key === 'l' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setLfoOpen((prev) => !prev)
       }
       if (e.key === 'Escape') {
         if (settingsOpen) setSettingsOpen(false)
@@ -101,7 +112,6 @@ function RootLayout() {
   return (
     <>
       <ModuleRenderer />
-      <LfoOverlay />
       <ModuleInfoBar />
       <Outlet />
 
@@ -110,6 +120,22 @@ function RootLayout() {
         className="fixed top-3 right-3 flex gap-1.5"
         style={{ zIndex: 99998 }}
       >
+        <button
+          onClick={() => setLfoOpen((p) => !p)}
+          style={{
+            background: lfoOpen ? 'rgba(255,255,255,0.15)' : 'transparent',
+            border: 'none',
+            color: lfoOpen ? '#fff' : 'rgba(255,255,255,0.5)',
+            width: 36,
+            height: 36,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <AudioWaveform size={20} />
+        </button>
         <button
           onClick={() => setPanelOpen((p) => !p)}
           style={{
@@ -144,6 +170,7 @@ function RootLayout() {
         </button>
       </div>
 
+      <LfoWindow visible={lfoOpen} />
       <ModuleControlsPanel visible={panelOpen} />
       <AppSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>

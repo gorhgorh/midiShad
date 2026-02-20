@@ -41,6 +41,13 @@ class MotionBoxes extends ModuleBase {
       ],
     },
     {
+      name: "style",
+      options: [
+        { name: "borderRadius", defaultVal: 4, type: "number", min: 0, max: 50 },
+        { name: "boxOpacity", defaultVal: 1, type: "number", min: 0, max: 1 },
+      ],
+    },
+    {
       name: "reset",
     },
   ];
@@ -51,6 +58,8 @@ class MotionBoxes extends ModuleBase {
     this.boxes = [];
     this.boxColor = "#ffffff";
     this.boxSize = 40;
+    this.borderRadius = 4;
+    this.boxOpacity = 1;
     this.init();
   }
 
@@ -78,7 +87,7 @@ class MotionBoxes extends ModuleBase {
       box.style.width = `${size}px`;
       box.style.height = `${size}px`;
       box.style.backgroundColor = this.boxColor;
-      box.style.borderRadius = "4px";
+      box.style.borderRadius = this.borderRadius + "px";
       box.style.left = `${Math.random() * (w - size)}px`;
       box.style.top = `${Math.random() * (h - size)}px`;
       box.style.opacity = "0";
@@ -90,7 +99,7 @@ class MotionBoxes extends ModuleBase {
     const { animate, stagger } = motion;
     animate(
       this.boxes,
-      { opacity: [0, 1], scale: [0, 1] },
+      { opacity: [0, this.boxOpacity], scale: [0, 1] },
       { duration: 0.4, delay: stagger(0.05) }
     );
   }
@@ -144,6 +153,15 @@ class MotionBoxes extends ModuleBase {
       { rotate: [0, turns * 360] },
       { duration, delay: stagger(0.04) }
     );
+  }
+
+  style({ borderRadius = 4, boxOpacity = 1 } = {}) {
+    this.borderRadius = borderRadius;
+    this.boxOpacity = boxOpacity;
+    this.boxes.forEach((b) => {
+      b.style.borderRadius = this.borderRadius + "px";
+      b.style.opacity = this.boxOpacity;
+    });
   }
 
   reset() {

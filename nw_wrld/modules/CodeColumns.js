@@ -12,6 +12,14 @@ class CodeColumns extends ModuleBase {
       options: [],
     },
     {
+      name: "style",
+      executeOnLoad: true,
+      options: [
+        { name: "textColor", defaultVal: "#ffffff", type: "color" },
+        { name: "highlightColor", defaultVal: "#ff0000", type: "color" },
+      ],
+    },
+    {
       name: "columnVisibility",
       executeOnLoad: true,
       options: [
@@ -34,6 +42,8 @@ class CodeColumns extends ModuleBase {
     this.name = CodeColumns.name;
     this.leftColumn = null;
     this.rightColumn = null;
+    this.textColor = "#ffffff";
+    this.highlightColor = "#ff0000";
     this.init();
   }
 
@@ -57,7 +67,7 @@ class CodeColumns extends ModuleBase {
     leftColumn.style.height = "100%";
     leftColumn.style.overflow = "hidden";
     leftColumn.style.fontSize = "calc(2px + 0.6vmin)";
-    leftColumn.style.color = "white";
+    leftColumn.style.color = this.textColor;
     leftColumn.style.paddingLeft = "3%";
     leftColumn.style.textAlign = "left";
     leftColumn.style.whiteSpace = "pre-wrap";
@@ -69,7 +79,7 @@ class CodeColumns extends ModuleBase {
     rightColumn.style.height = "100%";
     rightColumn.style.overflow = "hidden";
     rightColumn.style.fontSize = "calc(2px + 0.6vmin)";
-    rightColumn.style.color = "white";
+    rightColumn.style.color = this.textColor;
     rightColumn.style.paddingRight = "3%";
     rightColumn.style.textAlign = "right";
     rightColumn.style.whiteSpace = "pre-wrap";
@@ -111,7 +121,7 @@ class CodeColumns extends ModuleBase {
     }
 
     for (let index of indices) {
-      words[index] = `<span style="color: red;">${words[index]}</span>`;
+      words[index] = `<span style="color: ${this.highlightColor};">${words[index]}</span>`;
     }
 
     pythonCode = words.join(" ");
@@ -122,6 +132,14 @@ class CodeColumns extends ModuleBase {
 
   iterate() {
     if (!this.leftColumn || !this.rightColumn) return;
+    this.generateInitialContent();
+  }
+
+  style({ textColor = "#ffffff", highlightColor = "#ff0000" } = {}) {
+    this.textColor = textColor;
+    this.highlightColor = highlightColor;
+    if (this.leftColumn) this.leftColumn.style.color = this.textColor;
+    if (this.rightColumn) this.rightColumn.style.color = this.textColor;
     this.generateInitialContent();
   }
 

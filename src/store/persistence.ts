@@ -12,8 +12,10 @@ const KEYS = {
   lfoConfigs: 'midishad:lfoConfigs',
   lfos: 'midishad:lfos',
   lfoAssignments: 'midishad:lfoAssignments',
+  lfoAssignmentStrengths: 'midishad:lfoAssignmentStrengths',
   lfoParamMods: 'midishad:lfoParamMods',
   lfoParamBaseValues: 'midishad:lfoParamBaseValues',
+  lfoAssignmentDividers: 'midishad:lfoAssignmentDividers',
   clock: 'midishad:clock',
   paramCache: 'midishad:paramCache',
   optionCache: 'midishad:optionCache',
@@ -51,6 +53,16 @@ export function loadPersisted() {
     const assignRaw = localStorage.getItem(KEYS.lfoAssignments)
     if (assignRaw) {
       useLfoStore.setState({ assignments: JSON.parse(assignRaw) })
+    }
+
+    const assignStrRaw = localStorage.getItem(KEYS.lfoAssignmentStrengths)
+    if (assignStrRaw) {
+      useLfoStore.setState({ assignmentStrengths: JSON.parse(assignStrRaw) })
+    }
+
+    const assignDivRaw = localStorage.getItem(KEYS.lfoAssignmentDividers)
+    if (assignDivRaw) {
+      useLfoStore.setState({ assignmentDividers: JSON.parse(assignDivRaw) })
     }
 
     const lfoParamModsRaw = localStorage.getItem(KEYS.lfoParamMods)
@@ -119,6 +131,8 @@ export function setupPersistence() {
   useLfoStore.subscribe((state) => {
     localStorage.setItem(KEYS.lfos, JSON.stringify(state.lfos))
     localStorage.setItem(KEYS.lfoAssignments, JSON.stringify(state.assignments))
+    localStorage.setItem(KEYS.lfoAssignmentStrengths, JSON.stringify(state.assignmentStrengths))
+    localStorage.setItem(KEYS.lfoAssignmentDividers, JSON.stringify(state.assignmentDividers))
     localStorage.setItem(KEYS.lfoConfigs, JSON.stringify(state.configs))
     localStorage.setItem(KEYS.lfoParamMods, JSON.stringify(state.lfoParamMods))
     localStorage.setItem(KEYS.lfoParamBaseValues, JSON.stringify(state.lfoParamBaseValues))

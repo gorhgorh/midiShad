@@ -28,6 +28,14 @@ class Corners extends ModuleBase {
         },
       ],
     },
+    {
+      name: "lineStyle",
+      executeOnLoad: true,
+      options: [
+        { name: "lineWidth", defaultVal: 2, type: "number", min: 0.5, max: 10 },
+        { name: "padding", defaultVal: 0.05, type: "number", min: 0, max: 0.25 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -38,6 +46,8 @@ class Corners extends ModuleBase {
     this.ctx = null;
     this.color = "#ffffff";
     this.size = 20;
+    this.lineWidth = 2;
+    this.padding = 0.05;
     this.init();
   }
 
@@ -58,12 +68,12 @@ class Corners extends ModuleBase {
     const height = this.canvas.height;
     const size = this.size;
     const color = this.color;
-    const paddingX = width * 0.05;
-    const paddingY = height * 0.05;
+    const paddingX = width * this.padding;
+    const paddingY = height * this.padding;
 
     ctx.clearRect(0, 0, width, height);
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = this.lineWidth;
 
     ctx.beginPath();
     ctx.moveTo(paddingX, paddingY + size);
@@ -97,6 +107,12 @@ class Corners extends ModuleBase {
 
   size({ size = 20 } = {}) {
     this.size = size;
+    this.drawCarets();
+  }
+
+  lineStyle({ lineWidth = 2, padding = 0.05 } = {}) {
+    this.lineWidth = lineWidth;
+    this.padding = padding;
     this.drawCarets();
   }
 

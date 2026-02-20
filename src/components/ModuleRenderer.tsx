@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useModuleStore } from '../store/moduleStore'
 import { useLfoStore } from '../store/lfoStore'
 import { useClockStore } from '../store/clockStore'
+import { computeLfo } from '../lfo/engine'
 import { computeLfosInOrder } from '../lfo/graph'
 import type { ModuleInstance, ModuleDefinition } from '../types'
 
@@ -190,12 +191,20 @@ export function ModuleRenderer() {
       const activeModule = activeModRef.current
       if (!instance || !activeModule) return
 
-      const { lfos, assignments, baseValues, lfoParamMods, lfoParamBaseValues, ccValues } = useLfoStore.getState()
+      const { lfos, assignments, assignmentStrengths, assignmentDividers, baseValues, lfoParamMods, lfoParamBaseValues, ccValues } = useLfoStore.getState()
+
+      // Early exit: no assignments at all → skip everything
+      const assignmentKeys = Object.keys(assignments)
+      if (assignmentKeys.length === 0 || assignmentKeys.every((k) => !assignments[k])) return
+
       const { bpm } = useClockStore.getState()
       const elapsed = performance.now() / 1000
 
       // Pre-compute all 4 LFO outputs in dependency order
-      const lfoOutputs = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+      const { outputs: lfoOutputs, effectives } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+
+      // Batch param value updates
+      const paramUpdates: Record<string, number> = {}
 
       for (const param of activeModule.params) {
         const lfoId = assignments[param.name]
@@ -204,19 +213,29 @@ export function ModuleRenderer() {
         const lfo = lfos[lfoId]
         if (!lfo) continue
 
-        const lfoOutput = lfoOutputs[lfoId]
+        const assignDiv = assignmentDividers[param.name] ?? 1
+        let lfoOutput: number
+        if (assignDiv === 1) {
+          lfoOutput = lfoOutputs[lfoId]
+        } else {
+          // Recompute with per-assignment phase multiplier
+          lfoOutput = computeLfo(effectives[lfoId], bpm, elapsed, lfoId, assignDiv)
+        }
+
+        const strength = assignmentStrengths[param.name] ?? 0.5
         const base = baseValues[param.name] ?? param.default
         const range = param.max - param.min
 
-        let val: number
-        if (lfo.bipolar) {
-          val = base + lfoOutput * range
-        } else {
-          val = param.min + lfoOutput * range
-        }
-
+        let val = base + lfoOutput * strength * range
         val = Math.max(param.min, Math.min(param.max, val))
-        useModuleStore.getState().setParamValue(param.name, val)
+        paramUpdates[param.name] = val
+      }
+
+      // Batch all param updates into a single setState call
+      if (Object.keys(paramUpdates).length > 0) {
+        useModuleStore.setState((s) => ({
+          paramValues: { ...s.paramValues, ...paramUpdates },
+        }))
       }
 
       // Boolean options: LFO toggles with 10%/90% threshold
@@ -229,10 +248,9 @@ export function ModuleRenderer() {
         if (!lfo) continue
 
         const lfoOutput = lfoOutputs[lfoId]
-        const s = lfo.strength || 1
         const normalized = lfo.bipolar
-          ? (lfoOutput / s + 1) / 2
-          : lfoOutput / s
+          ? (lfoOutput + 1) / 2
+          : lfoOutput
         const current = useModuleStore.getState().optionValues[opt.name]
         if (normalized < 0.1 && current !== false) {
           useModuleStore.getState().setOptionValue(opt.name, false)

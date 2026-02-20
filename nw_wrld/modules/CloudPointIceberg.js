@@ -13,6 +13,14 @@ class CloudPointIceberg extends BaseThreeJsModule {
     {
       name: "randomizeColour",
     },
+    {
+      name: "style",
+      executeOnLoad: false,
+      options: [
+        { name: "pointSize", defaultVal: 0.03, type: "number", min: 0.005, max: 0.1 },
+        { name: "wireOpacity", defaultVal: 0.5, type: "number", min: 0, max: 1 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -290,6 +298,11 @@ class CloudPointIceberg extends BaseThreeJsModule {
 
     this.pointCloud = new THREE.Points(pointGeometry, pointMaterial);
     this.customGroup.add(this.pointCloud);
+  }
+
+  style({ pointSize = 0.03, wireOpacity = 0.5 } = {}) {
+    if (this.pointCloud) this.pointCloud.material.size = Number(pointSize) || 0.03;
+    if (this.wireMesh) this.wireMesh.material.opacity = Number(wireOpacity) || 0.5;
   }
 
   randomizeColour() {

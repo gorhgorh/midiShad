@@ -5,12 +5,11 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { RouteOff } from 'lucide-react'
 import { LfoWavePreview } from './LfoWavePreview'
 import { useLfoStore, LFO_SLOT_IDS, type LfoSlotId } from '@/store/lfoStore'
-import type { LfoShape, Divider, LfoParamName } from '@/lfo/engine'
+import { DIVIDER_OPTIONS, type LfoShape, type LfoParamName } from '@/lfo/engine'
 
 const SHAPES: { value: LfoShape; label: string }[] = [
   { value: 'sine', label: 'Sin' },
@@ -18,15 +17,10 @@ const SHAPES: { value: LfoShape; label: string }[] = [
   { value: 'square', label: 'Sq' },
   { value: 'sawtooth', label: 'Saw' },
   { value: 'noise', label: 'S&H' },
+  { value: 'perlin', label: 'Perl' },
 ]
 
-const DIVIDERS: { value: Divider; label: string }[] = [
-  { value: 0.25, label: '1/4' },
-  { value: 0.5, label: '1/2' },
-  { value: 1, label: '1' },
-  { value: 2, label: '2' },
-  { value: 4, label: '4' },
-]
+const DIVIDERS = DIVIDER_OPTIONS
 
 const LFO_COLORS: Record<LfoSlotId, string> = {
   lfo1: '#6ee7b7',
@@ -172,24 +166,6 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
         </div>
       )}
 
-      {/* Strength */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Label className="text-[10px] text-white/70">Strength</Label>
-            <LfoParamModRow lfoId={id} param="strength" />
-          </div>
-          <span className="text-[10px] text-white/70 tabular-nums">{lfo.strength.toFixed(2)}</span>
-        </div>
-        <Slider
-          min={0}
-          max={1}
-          step={0.01}
-          value={[lfo.strength]}
-          onValueChange={([v]) => setLfo(id, { strength: v })}
-        />
-      </div>
-
       {/* Bipolar */}
       <div className="flex items-center justify-between py-0.5">
         <Label className="text-[10px] text-white/70">Bipolar</Label>
@@ -242,21 +218,21 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
       ) : (
         <div className="space-y-1.5">
           <Label className="text-[10px] text-white/70">Divider</Label>
-          <ButtonGroup>
+          <div className="flex flex-wrap gap-0.5">
             {DIVIDERS.map((d) => (
               <Button
                 key={d.value}
                 size="xs"
                 variant="outline"
-                className={lfo.divider === d.value
+                className={`px-1.5 min-w-0 ${lfo.divider === d.value
                   ? 'bg-white/15 text-white border-white/20'
-                  : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}
+                  : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}`}
                 onClick={() => setLfo(id, { divider: d.value })}
               >
                 {d.label}
               </Button>
             ))}
-          </ButtonGroup>
+          </div>
         </div>
       )}
     </div>
@@ -265,15 +241,12 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
 
 export function LfoPanel() {
   const [activeSlot, setActiveSlot] = useState<LfoSlotId>('lfo1')
-  const showOverlay = useLfoStore((s) => s.showLfoOverlay)
-  const toggleOverlay = useLfoStore((s) => s.toggleLfoOverlay)
   const resetLfo = useLfoStore((s) => s.resetLfo)
 
   return (
     <div className="w-full space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <ButtonGroup>
+      <div className="flex items-center gap-1.5">
+        <ButtonGroup>
           {LFO_SLOT_IDS.map((id) => (
             <Button
               key={id}
@@ -290,23 +263,14 @@ export function LfoPanel() {
               {LFO_LABELS[id]}
             </Button>
           ))}
-          </ButtonGroup>
-          <button
-            onClick={() => resetLfo(activeSlot)}
-            className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors cursor-pointer"
-            title={`Reset ${LFO_LABELS[activeSlot]}`}
-          >
-            <RouteOff className="h-3 w-3" />
-          </button>
-        </div>
-        <label className="flex items-center gap-1.5 cursor-pointer">
-          <Checkbox
-            checked={showOverlay}
-            onCheckedChange={() => toggleOverlay()}
-            className="h-3.5 w-3.5"
-          />
-          <span className="text-[10px] text-white/60">Show</span>
-        </label>
+        </ButtonGroup>
+        <button
+          onClick={() => resetLfo(activeSlot)}
+          className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors cursor-pointer"
+          title={`Reset ${LFO_LABELS[activeSlot]}`}
+        >
+          <RouteOff className="h-3 w-3" />
+        </button>
       </div>
       <LfoSlotEditor id={activeSlot} />
     </div>

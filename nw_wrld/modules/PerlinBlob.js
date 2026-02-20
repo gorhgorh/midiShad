@@ -75,6 +75,16 @@ class PerlinBlob extends ModuleBase {
         },
       ],
     },
+    {
+      name: "style",
+      options: [
+        { name: "numLayers", defaultVal: 10, type: "number", min: 2, max: 20 },
+        { name: "hueStart", defaultVal: 200, type: "number", min: 0, max: 360 },
+        { name: "hueEnd", defaultVal: 250, type: "number", min: 0, max: 360 },
+        { name: "noiseSpeed", defaultVal: 0.005, type: "number", min: 0.001, max: 0.05 },
+        { name: "intensity", defaultVal: 5, type: "number", min: 1, max: 20 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -93,11 +103,17 @@ class PerlinBlob extends ModuleBase {
     this.frameCounter = 0;
 
     this.noiseOffsets = [];
+    this.numLayers = 10;
+    this.hueStart = 200;
+    this.hueEnd = 250;
+    this.noiseSpeed = 0.005;
+    this.intensity = 5;
     this.init();
   }
 
   init() {
     if (!p5) return;
+    const self = this;
     const sketch = (p) => {
       this.myp5 = p;
 
@@ -124,7 +140,7 @@ class PerlinBlob extends ModuleBase {
         p.clear();
         p.translate(p.width / 2, p.height / 2);
 
-        const numLayers = 10;
+        const numLayers = self.numLayers;
         if (this.noiseOffsets.length < numLayers) {
           while (this.noiseOffsets.length < numLayers) {
             this.noiseOffsets.push(p.random(1000));
@@ -147,7 +163,7 @@ class PerlinBlob extends ModuleBase {
         );
         this.frameCounter = Math.min(cycleFrames, this.frameCounter + 1);
 
-        const intensity = 5;
+        const intensity = self.intensity;
         const adjusted = Math.min(
           200,
           Math.abs(this.displayValue) * intensity + 5
@@ -164,7 +180,7 @@ class PerlinBlob extends ModuleBase {
             p.map(i, 0, numLayers - 1, minStrokeWeight, maxStrokeWeight)
           );
 
-          const hue = p.map(i, 0, numLayers - 1, 200, 250);
+          const hue = p.map(i, 0, numLayers - 1, self.hueStart, self.hueEnd);
           p.stroke(p.color(`hsb(${hue}, 70%, 70%)`));
 
           const applyCompression = p.random() < 0.5;
@@ -220,7 +236,7 @@ class PerlinBlob extends ModuleBase {
           p.endShape(p.CLOSE);
 
           previousLayerRadii = currentLayerRadii;
-          this.noiseOffsets[i] += 0.005;
+          this.noiseOffsets[i] += self.noiseSpeed;
         }
       };
     };
@@ -251,6 +267,14 @@ class PerlinBlob extends ModuleBase {
       out.push(Math.sin(i * 0.18) * 30 + 50);
     }
     return out;
+  }
+
+  style({ numLayers = 10, hueStart = 200, hueEnd = 250, noiseSpeed = 0.005, intensity = 5 } = {}) {
+    this.numLayers = numLayers;
+    this.hueStart = hueStart;
+    this.hueEnd = hueEnd;
+    this.noiseSpeed = noiseSpeed;
+    this.intensity = intensity;
   }
 
   async loadData({

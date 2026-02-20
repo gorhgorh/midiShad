@@ -7,6 +7,7 @@
 class BasicGeometry extends BaseThreeJsModule {
   static category = "3D";
   static methods = [
+    ...BaseThreeJsModule.methods,
     {
       name: "shape",
       executeOnLoad: false,
@@ -26,12 +27,28 @@ class BasicGeometry extends BaseThreeJsModule {
         },
       ],
     },
+    {
+      name: "speed",
+      executeOnLoad: false,
+      options: [
+        { name: "rotationSpeed", defaultVal: 0.25, type: "number", min: 0, max: 2 },
+      ],
+    },
+    {
+      name: "colors",
+      executeOnLoad: false,
+      options: [
+        { name: "wireColor", defaultVal: "#ffffff", type: "color" },
+        { name: "segmentColor", defaultVal: "#E24519", type: "color" },
+      ],
+    },
   ];
 
   constructor(container) {
     super(container);
     if (!THREE) return;
 
+    this.rotSpeed = 0.25;
     this.customGroup = new THREE.Group();
     this.line = null;
     this.lineSegments = null;
@@ -79,9 +96,18 @@ class BasicGeometry extends BaseThreeJsModule {
     if (this.destroyed) return;
     const t = performance.now() * 0.001;
     if (this.customGroup) {
-      this.customGroup.rotation.x = 0.25 * t;
-      this.customGroup.rotation.y = 0.25 * t;
+      this.customGroup.rotation.x = this.rotSpeed * t;
+      this.customGroup.rotation.y = this.rotSpeed * t;
     }
+  }
+
+  speed({ rotationSpeed = 0.25 } = {}) {
+    this.rotSpeed = Number(rotationSpeed) || 0.25;
+  }
+
+  colors({ wireColor = "#ffffff", segmentColor = "#E24519" } = {}) {
+    if (this.line) this.line.material.color.set(wireColor);
+    if (this.lineSegments) this.lineSegments.material.color.set(segmentColor);
   }
 
   shape({ shape = "cylinder" } = {}) {

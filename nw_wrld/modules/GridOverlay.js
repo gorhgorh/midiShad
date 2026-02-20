@@ -35,6 +35,14 @@ class GridOverlay extends ModuleBase {
         },
       ],
     },
+    {
+      name: "style",
+      executeOnLoad: true,
+      options: [
+        { name: "lineWidth", defaultVal: 1, type: "number", min: 0.5, max: 5 },
+        { name: "opacity", defaultVal: 1, type: "number", min: 0, max: 1 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -44,6 +52,8 @@ class GridOverlay extends ModuleBase {
     this.x = 18;
     this.y = 18;
     this.gridColor = "#ffffff";
+    this.lineWidth = 1;
+    this.opacity = 1;
     this.init();
   }
 
@@ -62,8 +72,8 @@ class GridOverlay extends ModuleBase {
     const ctx = this.gridElem.getContext("2d");
 
     ctx.strokeStyle = this.gridColor;
-    ctx.lineWidth = 1;
-    this.gridElem.style.opacity = 1;
+    ctx.lineWidth = this.lineWidth;
+    this.gridElem.style.opacity = this.opacity;
 
     const cellWidth = this.gridElem.width / this.x;
     const cellHeight = this.gridElem.height / this.y;
@@ -95,6 +105,12 @@ class GridOverlay extends ModuleBase {
 
   color({ color = "#ffffff" } = {}) {
     this.gridColor = color;
+    this.createGrid();
+  }
+
+  style({ lineWidth = 1, opacity = 1 } = {}) {
+    this.lineWidth = lineWidth;
+    this.opacity = opacity;
     this.createGrid();
   }
 
