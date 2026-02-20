@@ -22,25 +22,24 @@ Object.assign(globalThis, {
   d3,
   Noise,
   motion,
-  // Asset helpers — resolve paths relative to public/ (served at / by Vite).
+  // Asset helpers — resolve paths relative to public/ using Vite's base path.
   // Full URLs (http/data) are passed through as-is.
   assetUrl: (path: string) => {
     if (!path) return null
     if (/^(https?:|data:|blob:)/.test(path)) return path
-    // Strip leading "assets/" prefix used by nw_wrld platform
-    const clean = path.replace(/^assets\//, '')
-    return `/${clean}`
+    const clean = path.replace(/^assets\//, '').replace(/^\//, '')
+    return `${import.meta.env.BASE_URL}${clean}`
   },
   readText: async (path: string) => {
     try {
-      const url = /^https?:/.test(path) ? path : `/${path.replace(/^assets\//, '')}`
+      const url = /^https?:/.test(path) ? path : `${import.meta.env.BASE_URL}${path.replace(/^assets\//, '').replace(/^\//, '')}`
       const res = await fetch(url)
       return res.ok ? res.text() : null
     } catch { return null }
   },
   loadJson: async (path: string) => {
     try {
-      const url = /^https?:/.test(path) ? path : `/${path.replace(/^assets\//, '')}`
+      const url = /^https?:/.test(path) ? path : `${import.meta.env.BASE_URL}${path.replace(/^assets\//, '').replace(/^\//, '')}`
       const res = await fetch(url)
       return res.ok ? res.json() : null
     } catch { return null }

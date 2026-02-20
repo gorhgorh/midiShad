@@ -2,6 +2,32 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@font-face {
+  font-family: 'Silver';
+  src: url('./assets/fonts/Silver.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  ascent-override: 80%;
+  descent-override: 20%;
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  src: url('./assets/fonts/RobotoMono-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  src: url('./assets/fonts/RobotoMono-Italic-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 700;
+  font-style: italic;
+  font-display: block;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -41,98 +67,11 @@
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.375rem;
+  --radius-4xl: 1.625rem;
   --animate-collapsible-open: collapsible-open 200ms ease-out;
   --animate-collapsible-close: collapsible-close 200ms ease-out;
-}
-
-*,
-*::before,
-*::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #000;
-  font-family: 'Inter', sans-serif;
-}
-
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @keyframes collapsible-open {
@@ -145,10 +84,62 @@ body,
 }
 
 @layer base {
+  /* Only box-border globally — safe, no visual side effects */
   * {
-    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+  html, body, #root {
+    @apply w-full h-full overflow-hidden bg-black;
   }
   body {
     @apply bg-background text-foreground;
   }
+  /* Shadcn base styles scoped to UI only — not module layer */
+  .ui-chrome *, .ui-chrome {
+    @apply border-border outline-ring/50;
+  }
 }
+
+/*
+ * Module isolation: cut the Tailwind/shadcn inheritance chain.
+ * Only reset properties that actually bleed from body/preflight.
+ * Layout properties (display, position, etc.) are left alone.
+ */
+.module-container, .module-container * {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: normal;
+  font-size: initial;
+  color: initial;
+  border-color: initial;
+  outline-color: initial;
+  letter-spacing: normal;
+  line-height: normal;
+}
+
+/* UI chrome: font, weight, sizes — scoped so modules are unaffected */
+.ui-chrome {
+  font-family: 'Silver', sans-serif;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+/* Scale: small */
+[data-ui-scale="small"] .ui-chrome { font-size: 14px; }
+[data-ui-scale="small"] .ui-chrome .text-\[10px\] { font-size: 12px; }
+[data-ui-scale="small"] .ui-chrome .text-\[9px\] { font-size: 11px; }
+[data-ui-scale="small"] .ui-chrome .text-xs { font-size: 13px; }
+[data-ui-scale="small"] .ui-chrome .text-sm { font-size: 14px; }
+
+/* Scale: normal (default) */
+[data-ui-scale="normal"] .ui-chrome { font-size: 17px; }
+[data-ui-scale="normal"] .ui-chrome .text-\[10px\] { font-size: 15px; }
+[data-ui-scale="normal"] .ui-chrome .text-\[9px\] { font-size: 14px; }
+[data-ui-scale="normal"] .ui-chrome .text-xs { font-size: 16px; }
+[data-ui-scale="normal"] .ui-chrome .text-sm { font-size: 17px; }
+
+/* Scale: big */
+[data-ui-scale="big"] .ui-chrome { font-size: 20px; }
+[data-ui-scale="big"] .ui-chrome .text-\[10px\] { font-size: 18px; }
+[data-ui-scale="big"] .ui-chrome .text-\[9px\] { font-size: 17px; }
+[data-ui-scale="big"] .ui-chrome .text-xs { font-size: 19px; }
+[data-ui-scale="big"] .ui-chrome .text-sm { font-size: 20px; }

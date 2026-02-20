@@ -1,15 +1,35 @@
 import * as THREE from 'three'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { ModuleBase } from './ModuleBase'
 
 /**
  * Base class for Three.js modules. Extends ModuleBase with a
- * THREE scene, camera, renderer, and rAF loop.
+ * THREE scene, camera, renderer, OrbitControls, and rAF loop.
  */
 export class BaseThreeJsModule extends ModuleBase {
-  static override methods: unknown[] = []
+  static override methods: unknown[] = [
+    {
+      name: 'cameraPosition',
+      executeOnLoad: false,
+      options: [
+        { name: 'camX', defaultVal: 0, type: 'number', min: -20, max: 20 },
+        { name: 'camY', defaultVal: 0, type: 'number', min: -20, max: 20 },
+        { name: 'camZ', defaultVal: 5, type: 'number', min: 0.5, max: 40 },
+      ],
+    },
+    {
+      name: 'cameraZoom',
+      executeOnLoad: false,
+      options: [
+        { name: 'zoom', defaultVal: 50, type: 'number', min: 0, max: 100 },
+      ],
+    },
+  ]
+
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
   renderer: THREE.WebGLRenderer
+  controls: OrbitControls
   cameraSettings: { cameraSpeed: number }
   private _animId: number | null = null
   private _customAnimate: (() => void) | null = null
@@ -36,6 +56,13 @@ export class BaseThreeJsModule extends ModuleBase {
       this.elem.appendChild(this.renderer.domElement)
     }
 
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement)
+    this.controls.enableDamping = true
+    this.controls.dampingFactor = 0.05
+    this.controls.enablePan = true
+    this.controls.enableRotate = true
+    this.controls.enableZoom = true
+
     this._boundResize = this._resize.bind(this)
     window.addEventListener('resize', this._boundResize)
 
@@ -61,6 +88,24 @@ export class BaseThreeJsModule extends ModuleBase {
     // subclass override
   }
 
+  /** Set camera position directly */
+  cameraPosition({ camX, camY, camZ }: { camX?: number; camY?: number; camZ?: number } = {}) {
+    if (camX !== undefined) this.camera.position.x = camX
+    if (camY !== undefined) this.camera.position.y = camY
+    if (camZ !== undefined) this.camera.position.z = camZ
+    this.camera.lookAt(this.controls.target)
+  }
+
+  /** Set zoom as 0-100% (distance from target) */
+  cameraZoom({ zoom = 50 }: { zoom?: number } = {}) {
+    const dir = new THREE.Vector3()
+    dir.subVectors(this.camera.position, this.controls.target).normalize()
+    const minDist = 0.5
+    const maxDist = 40
+    const dist = THREE.MathUtils.lerp(minDist, maxDist, zoom / 100)
+    this.camera.position.copy(this.controls.target).addScaledVector(dir, dist)
+  }
+
   private _resize() {
     if (!this.elem) return
     const w = this.elem.clientWidth
@@ -74,6 +119,7 @@ export class BaseThreeJsModule extends ModuleBase {
   private _loop() {
     if (!this.elem) return
     this._animId = requestAnimationFrame(() => this._loop())
+    this.controls.update()
     if (this._customAnimate) this._customAnimate()
     this.animate()
     this.renderer.render(this.scene, this.camera)
@@ -84,6 +130,7 @@ export class BaseThreeJsModule extends ModuleBase {
       cancelAnimationFrame(this._animId)
       this._animId = null
     }
+    this.controls.dispose()
     window.removeEventListener('resize', this._boundResize)
     this.renderer.dispose()
     super.destroy()

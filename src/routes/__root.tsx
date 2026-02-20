@@ -1,14 +1,17 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
+import { Settings, Component } from 'lucide-react'
 import { ModuleRenderer } from '../components/ModuleRenderer'
 import { ModuleInfoBar } from '../components/ModuleInfoBar'
 import { ModuleControlsPanel } from '../components/ModuleControlsPanel'
 import { AppSettingsDialog } from '../components/AppSettingsDialog'
+import { LfoOverlay } from '../components/LfoOverlay'
 import { useMidi } from '../midi/useMidi'
 import { loadPersisted, setupPersistence } from '../store/persistence'
 import { useModuleStore } from '../store/moduleStore'
+import { useUiStore } from '../store/uiStore'
 import '../nwwrld/register'
-import { loadModules } from '../nwwrld/loader'
+import { loadModules, toKebab } from '../nwwrld/loader'
 
 const PANEL_STORAGE_KEY = 'midishad:panelOpen'
 
@@ -22,6 +25,12 @@ function RootLayout() {
   const [panelOpen, setPanelOpen] = useState(() => {
     try { return localStorage.getItem(PANEL_STORAGE_KEY) !== 'false' } catch { return true }
   })
+  const scale = useUiStore((s) => s.scale)
+
+  // Apply data-ui-scale on <html>
+  useEffect(() => {
+    document.documentElement.setAttribute('data-ui-scale', scale)
+  }, [scale])
 
   // Load modules + persistence on mount
   const initRef = useRef(false)
@@ -33,6 +42,15 @@ function RootLayout() {
       useModuleStore.getState().setModules(mods)
       loadPersisted()
       setupPersistence()
+
+      // URL ?module= param: select module by kebab-case slug
+      const params = new URLSearchParams(window.location.search)
+      const moduleSlug = params.get('module')
+      if (moduleSlug) {
+        const match = mods.find((m) => toKebab(m.id) === moduleSlug)
+        if (match) useModuleStore.getState().setActiveModule(match.id)
+      }
+
       setLoading(false)
     })()
   }, [])
@@ -83,8 +101,49 @@ function RootLayout() {
   return (
     <>
       <ModuleRenderer />
+      <LfoOverlay />
       <ModuleInfoBar />
       <Outlet />
+
+      {/* Top-right corner buttons (tablet-friendly) */}
+      <div
+        className="fixed top-3 right-3 flex gap-1.5"
+        style={{ zIndex: 99998 }}
+      >
+        <button
+          onClick={() => setPanelOpen((p) => !p)}
+          style={{
+            background: panelOpen ? 'rgba(255,255,255,0.15)' : 'transparent',
+            border: 'none',
+            color: panelOpen ? '#fff' : 'rgba(255,255,255,0.5)',
+            width: 36,
+            height: 36,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Component size={20} />
+        </button>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(255,255,255,0.5)',
+            width: 36,
+            height: 36,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Settings size={20} />
+        </button>
+      </div>
+
       <ModuleControlsPanel visible={panelOpen} />
       <AppSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>

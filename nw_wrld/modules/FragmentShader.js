@@ -20,19 +20,22 @@ uniform float u_time_delta;
 uniform float u_frame;
 uniform vec4 u_mouse;
 uniform vec4 u_date;
+uniform vec3 u_color;
+uniform float u_ripple_scale;
 
 void main()
 {
     fragColor = vec4(0.0);
     vec3 w,
     p;
-    for(float z, d = 0.1, i, f; i++ < 1e2; fragColor += 0.03 / abs(mix(p, w, 0.1).y + vec4(0, 1, 2, 3) / 1e2) * d, z += d = 0.3 * (length(cos(p.xz)) - 0.4))
+    for(float z, d = 0.1, i, f; i++ < 1e2; fragColor += 0.03 / abs(mix(p, w, 0.1).y + vec4(0, 1, 2, 3) / 1e2) * d, z += d = 0.3 * (length(cos(p.xz * u_ripple_scale)) - 0.4))
     {
         for(p = z * (gl_FragCoord.rgb * 2.0 - vec3(u_resolution, 1.0).xyy) / vec3(u_resolution, 1.0).y + 1.0, w = p, f = 0.0; f++ < 5.0; )
         {
             w += sin(w.zxy * f - 9.0 * exp( - d / 0.1) + u_time) / f;
         }
     }
+    fragColor.rgb *= u_color;
     fragColor = tanh(fragColor);
 }
 `;
@@ -43,13 +46,31 @@ class FragmentShader extends ModuleBase {
       name: "speed",
       executeOnLoad: true,
       options: [
-        {
-          name: "timeScale",
-          defaultVal: 1.0,
-          type: "number",
-          min: 0.0,
-          max: 5.0,
-        },
+        { name: "timeScale", defaultVal: 1.0, type: "number", min: 0.0, max: 5.0 },
+      ],
+    },
+    {
+      name: "mousePosition",
+      executeOnLoad: false,
+      options: [
+        { name: "mouseX", defaultVal: 0.5, type: "number", min: 0.0, max: 1.0 },
+        { name: "mouseY", defaultVal: 0.5, type: "number", min: 0.0, max: 1.0 },
+      ],
+    },
+    {
+      name: "ripple",
+      executeOnLoad: true,
+      options: [
+        { name: "scale", defaultVal: 1.0, type: "number", min: 0.1, max: 5.0 },
+      ],
+    },
+    {
+      name: "color",
+      executeOnLoad: true,
+      options: [
+        { name: "red", defaultVal: 1.0, type: "number", min: 0.0, max: 2.0 },
+        { name: "green", defaultVal: 1.0, type: "number", min: 0.0, max: 2.0 },
+        { name: "blue", defaultVal: 1.0, type: "number", min: 0.0, max: 2.0 },
       ],
     },
   ];
@@ -67,6 +88,10 @@ class FragmentShader extends ModuleBase {
     this.lastTime = 0;
     this.timeScale = 1.0;
     this.mouse = [0, 0, 0, 0];
+    this.colorR = 1.0;
+    this.colorG = 1.0;
+    this.colorB = 1.0;
+    this.rippleScale = 1.0;
     this.loc = {};
 
     this.boundResize = this.resizeCanvas.bind(this);
@@ -134,6 +159,8 @@ class FragmentShader extends ModuleBase {
       frame: this.gl.getUniformLocation(this.program, "u_frame"),
       mouse: this.gl.getUniformLocation(this.program, "u_mouse"),
       date: this.gl.getUniformLocation(this.program, "u_date"),
+      color: this.gl.getUniformLocation(this.program, "u_color"),
+      rippleScale: this.gl.getUniformLocation(this.program, "u_ripple_scale"),
     };
 
     this.canvas.addEventListener("mousemove", this.boundMouseMove);
@@ -193,6 +220,22 @@ class FragmentShader extends ModuleBase {
     this.timeScale = Number(timeScale) || 1.0;
   }
 
+  mousePosition({ mouseX = 0.5, mouseY = 0.5 } = {}) {
+    if (!this.canvas) return;
+    this.mouse[0] = mouseX * this.canvas.width;
+    this.mouse[1] = mouseY * this.canvas.height;
+  }
+
+  ripple({ scale = 1.0 } = {}) {
+    this.rippleScale = Number(scale) || 1.0;
+  }
+
+  color({ red = 1.0, green = 1.0, blue = 1.0 } = {}) {
+    this.colorR = Number(red);
+    this.colorG = Number(green);
+    this.colorB = Number(blue);
+  }
+
   animate() {
     if (this.destroyed || !this.gl || !this.program) return;
 
@@ -220,6 +263,8 @@ class FragmentShader extends ModuleBase {
       this.mouse[2],
       this.mouse[3]
     );
+    this.gl.uniform3f(this.loc.color, this.colorR, this.colorG, this.colorB);
+    this.gl.uniform1f(this.loc.rippleScale, this.rippleScale);
     const d = new Date();
     this.gl.uniform4f(
       this.loc.date,

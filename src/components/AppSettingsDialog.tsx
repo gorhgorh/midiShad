@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -13,14 +14,22 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup } from '@/components/ui/button-group'
 import { useMidiStore } from '@/store/midiStore'
 import { useClockStore, type ClockSource } from '@/store/clockStore'
+import { useUiStore, type UiScale } from '@/store/uiStore'
 
 interface AppSettingsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
+
+const SCALES: { value: UiScale; label: string }[] = [
+  { value: 'small', label: 'Small' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'big', label: 'Big' },
+]
 
 export function AppSettingsDialog({ open, onOpenChange }: AppSettingsDialogProps) {
   const devices = useMidiStore((s) => s.devices)
@@ -30,14 +39,36 @@ export function AppSettingsDialog({ open, onOpenChange }: AppSettingsDialogProps
   const setBpm = useClockStore((s) => s.setBpm)
   const clockSource = useClockStore((s) => s.source)
   const setClockSource = useClockStore((s) => s.setSource)
+  const scale = useUiStore((s) => s.scale)
+  const setScale = useUiStore((s) => s.setScale)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] bg-black/95 border-border">
+      <DialogContent className="ui-chrome sm:max-w-[400px] bg-black/95 border-border p-6">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
+          <DialogDescription className="sr-only">Application settings</DialogDescription>
         </DialogHeader>
         <div className="space-y-5 px-2">
+          <div className="space-y-2">
+            <Label>UI Scale</Label>
+            <ButtonGroup>
+              {SCALES.map((s) => (
+                <Button
+                  key={s.value}
+                  size="xs"
+                  variant="outline"
+                  className={scale === s.value
+                    ? 'bg-white/15 text-white border-white/20'
+                    : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}
+                  onClick={() => setScale(s.value)}
+                >
+                  {s.label}
+                </Button>
+              ))}
+            </ButtonGroup>
+          </div>
+
           <div className="space-y-2">
             <Label>MIDI Device</Label>
             <Select
@@ -60,15 +91,21 @@ export function AppSettingsDialog({ open, onOpenChange }: AppSettingsDialogProps
 
           <div className="space-y-2">
             <Label>Clock Source</Label>
-            <ToggleGroup
-              type="single"
-              value={clockSource}
-              onValueChange={(v) => v && setClockSource(v as ClockSource)}
-              className="justify-start"
-            >
-              <ToggleGroupItem value="manual" className="h-7 px-3 text-xs">Manual</ToggleGroupItem>
-              <ToggleGroupItem value="midi" className="h-7 px-3 text-xs">MIDI Clock</ToggleGroupItem>
-            </ToggleGroup>
+            <ButtonGroup>
+              {(['manual', 'midi'] as const).map((src) => (
+                <Button
+                  key={src}
+                  size="xs"
+                  variant="outline"
+                  className={clockSource === src
+                    ? 'bg-white/15 text-white border-white/20'
+                    : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}
+                  onClick={() => setClockSource(src as ClockSource)}
+                >
+                  {src === 'manual' ? 'Manual' : 'MIDI Clock'}
+                </Button>
+              ))}
+            </ButtonGroup>
           </div>
 
           {clockSource === 'manual' && (

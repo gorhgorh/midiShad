@@ -1,99 +1,119 @@
 import { useRef, useEffect } from 'react'
-import type { LfoShape } from '@/lfo/engine'
+import { shapedWave, type LfoParamName } from '@/lfo/engine'
+import { computeLfosInOrder } from '@/lfo/graph'
+import { useLfoStore, type LfoSlotId } from '@/store/lfoStore'
+import { useClockStore } from '@/store/clockStore'
+
+const MODULABLE_PARAMS: LfoParamName[] = ['strength', 'hz', 'drive', 'symmetry']
 
 interface LfoWavePreviewProps {
-  shape: LfoShape
+  lfoId: LfoSlotId
   color?: string
-  /** Scroll speed in cycles per second (default 0.5) */
-  speed?: number
 }
 
-function waveValue(shape: LfoShape, phase: number): number {
-  const p = ((phase % 1) + 1) % 1
-  switch (shape) {
-    case 'sine':
-      return Math.sin(p * 2 * Math.PI)
-    case 'triangle':
-      return p < 0.5 ? (4 * p - 1) : (3 - 4 * p)
-    case 'square':
-      return p < 0.5 ? 1 : -1
-    case 'sawtooth':
-      return 2 * p - 1
-    case 'noise':
-      return ((Math.sin(Math.floor(phase * 8) * 127.1) * 43758.5453) % 1) * 2 - 1
-  }
-}
-
-export function LfoWavePreview({ shape, color = '#6ee7b7', speed = 0.5 }: LfoWavePreviewProps) {
+export function LfoWavePreview({ lfoId, color = '#6ee7b7' }: LfoWavePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number>(0)
-  const startRef = useRef<number>(0)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const c = canvas.getContext('2d')
+    if (!c) return
 
     const dpr = window.devicePixelRatio || 1
     const w = canvas.clientWidth
     const h = canvas.clientHeight
     canvas.width = w * dpr
     canvas.height = h * dpr
-    ctx.scale(dpr, dpr)
+    c.scale(dpr, dpr)
 
-    startRef.current = performance.now()
+    function draw() {
+      const { lfos, lfoParamMods, lfoParamBaseValues, ccValues } = useLfoStore.getState()
+      const { bpm } = useClockStore.getState()
+      const elapsed = performance.now() / 1000
 
-    function draw(now: number) {
-      const elapsed = (now - startRef.current) / 1000
+      // Compute all LFO outputs with modulation
+      const lfoOutputs = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+
+      // Build effective definition (with modulations applied)
+      const baseLfo = lfos[lfoId]
+      const lfo = { ...baseLfo }
+      for (const param of MODULABLE_PARAMS) {
+        const modKey = `${lfoId}.${param}`
+        const mod = lfoParamMods[modKey]
+        if (!mod) continue
+        const base = lfoParamBaseValues[modKey] ?? lfo[param]
+        if (mod.type === 'lfo' && mod.lfoId && lfoOutputs[mod.lfoId] !== undefined) {
+          lfo[param] = Math.max(0, Math.min(1, base + lfoOutputs[mod.lfoId]))
+        } else if (mod.type === 'cc' && mod.ccNumber !== undefined) {
+          const ccVal = ccValues[mod.ccNumber]
+          if (ccVal !== undefined) lfo[param] = ccVal / 127
+        }
+      }
+
+      const speed = lfo.speedMode === 'hz' ? lfo.hz : (bpm / 60) * lfo.divider
       const offset = elapsed * speed
 
-      ctx.clearRect(0, 0, w, h)
-
-      // Background
-      ctx.fillStyle = 'rgba(0,0,0,0.4)'
-      ctx.fillRect(0, 0, w, h)
+      c!.clearRect(0, 0, w, h)
+      c!.fillStyle = 'rgba(0,0,0,0.4)'
+      c!.fillRect(0, 0, w, h)
 
       // Center line
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(0, h / 2)
-      ctx.lineTo(w, h / 2)
-      ctx.stroke()
+      const centerY = lfo.bipolar ? h / 2 : h - 4
+      c!.strokeStyle = 'rgba(255,255,255,0.1)'
+      c!.lineWidth = 1
+      c!.beginPath()
+      c!.moveTo(0, centerY)
+      c!.lineTo(w, centerY)
+      c!.stroke()
 
-      // Playhead: thin vertical line at the left edge sweeping right
-      const playheadX = ((offset % 1) * w)
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(playheadX, 0)
-      ctx.lineTo(playheadX, h)
-      ctx.stroke()
+      // Playhead
+      const playheadX = (offset % 1) * w
+      c!.strokeStyle = 'rgba(255,255,255,0.25)'
+      c!.lineWidth = 1
+      c!.beginPath()
+      c!.moveTo(playheadX, 0)
+      c!.lineTo(playheadX, h)
+      c!.stroke()
 
-      // Wave — draw 2 cycles, scrolling
-      ctx.strokeStyle = color
-      ctx.lineWidth = 2
-      ctx.beginPath()
+      // Waveform — 2 cycles, using effective params
+      c!.strokeStyle = color
+      c!.lineWidth = 2
+      c!.beginPath()
 
       const steps = w
+      const margin = 4
       for (let i = 0; i <= steps; i++) {
         const phase = (i / steps) * 2 + offset
-        const val = waveValue(shape, phase)
+        const raw = shapedWave(lfo.shape, phase, lfo.drive ?? 0, lfo.symmetry ?? 0.5, `_preview_${lfoId}`, lfo.randomFreq)
+
+        let val: number
+        if (lfo.bipolar) {
+          val = raw * lfo.strength
+        } else {
+          val = ((raw + 1) / 2) * lfo.strength
+        }
+
         const x = (i / steps) * w
-        const y = h / 2 - (val * (h / 2 - 4))
-        if (i === 0) ctx.moveTo(x, y)
-        else ctx.lineTo(x, y)
+        let y: number
+        if (lfo.bipolar) {
+          y = h / 2 - val * (h / 2 - margin)
+        } else {
+          y = (h - margin) - val * (h - margin * 2)
+        }
+
+        if (i === 0) c!.moveTo(x, y)
+        else c!.lineTo(x, y)
       }
-      ctx.stroke()
+      c!.stroke()
 
       rafRef.current = requestAnimationFrame(draw)
     }
 
     rafRef.current = requestAnimationFrame(draw)
-
     return () => cancelAnimationFrame(rafRef.current)
-  }, [shape, color, speed])
+  }, [lfoId, color])
 
   return (
     <canvas

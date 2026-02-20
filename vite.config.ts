@@ -5,7 +5,24 @@ import tailwindcss from '@tailwindcss/vite'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 
 export default defineConfig({
-  plugins: [tailwindcss(), TanStackRouterVite(), react()],
+  base: '/particles/',
+  plugins: [
+    tailwindcss(),
+    TanStackRouterVite(),
+    react(),
+    {
+      name: 'base-path-redirect',
+      configureServer(server) {
+        // Redirect /particles (no trailing slash) to /particles/ so the SPA loads
+        server.middlewares.use((req, _res, next) => {
+          if (req.url && /^\/particles(\?.*)?$/.test(req.url)) {
+            req.url = req.url.replace('/particles', '/particles/')
+          }
+          next()
+        })
+      },
+    },
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -1,6 +1,6 @@
 import { useModuleStore } from './moduleStore'
 import { useMidiStore } from './midiStore'
-import { useLfoStore } from './lfoStore'
+import { useLfoStore, type LfoSlotId } from './lfoStore'
 import { useClockStore } from './clockStore'
 import { createDefaultLfo } from '../lfo/engine'
 
@@ -12,6 +12,8 @@ const KEYS = {
   lfoConfigs: 'midishad:lfoConfigs',
   lfos: 'midishad:lfos',
   lfoAssignments: 'midishad:lfoAssignments',
+  lfoParamMods: 'midishad:lfoParamMods',
+  lfoParamBaseValues: 'midishad:lfoParamBaseValues',
   clock: 'midishad:clock',
   paramCache: 'midishad:paramCache',
   optionCache: 'midishad:optionCache',
@@ -51,13 +53,23 @@ export function loadPersisted() {
       useLfoStore.setState({ assignments: JSON.parse(assignRaw) })
     }
 
+    const lfoParamModsRaw = localStorage.getItem(KEYS.lfoParamMods)
+    if (lfoParamModsRaw) {
+      useLfoStore.setState({ lfoParamMods: JSON.parse(lfoParamModsRaw) })
+    }
+
+    const lfoParamBaseValuesRaw = localStorage.getItem(KEYS.lfoParamBaseValues)
+    if (lfoParamBaseValuesRaw) {
+      useLfoStore.setState({ lfoParamBaseValues: JSON.parse(lfoParamBaseValuesRaw) })
+    }
+
     // Legacy LFO configs migration
     const lfoRaw = localStorage.getItem(KEYS.lfoConfigs)
     if (lfoRaw && !lfosRaw) {
       // Old format: Record<paramName, { enabled, period }>
       // Migrate: set assignments for enabled params to lfo1
       const oldConfigs = JSON.parse(lfoRaw)
-      const assignments: Record<string, string | null> = {}
+      const assignments: Record<string, LfoSlotId | null> = {}
       for (const [paramName, cfg] of Object.entries(oldConfigs)) {
         const c = cfg as { enabled: boolean; period: number }
         if (c.enabled) assignments[paramName] = 'lfo1'
@@ -108,6 +120,8 @@ export function setupPersistence() {
     localStorage.setItem(KEYS.lfos, JSON.stringify(state.lfos))
     localStorage.setItem(KEYS.lfoAssignments, JSON.stringify(state.assignments))
     localStorage.setItem(KEYS.lfoConfigs, JSON.stringify(state.configs))
+    localStorage.setItem(KEYS.lfoParamMods, JSON.stringify(state.lfoParamMods))
+    localStorage.setItem(KEYS.lfoParamBaseValues, JSON.stringify(state.lfoParamBaseValues))
   })
 
   useClockStore.subscribe((state) => {

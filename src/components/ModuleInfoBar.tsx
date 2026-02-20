@@ -23,7 +23,7 @@ export function ModuleInfoBar() {
 
   return (
     <div
-      className="fixed bottom-3 left-0 right-0 flex justify-between items-end px-4 z-5 pointer-events-none transition-opacity"
+      className="ui-chrome fixed bottom-3 left-0 right-0 flex justify-between items-end px-4 z-5 pointer-events-none transition-opacity"
       style={{
         opacity: visible ? 1 : 0,
         transitionDuration: `${config.infoFadeDuration}s`,

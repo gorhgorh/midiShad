@@ -11,6 +11,24 @@ class MathOrbitalMap extends ModuleBase {
       executeOnLoad: false,
       options: [],
     },
+    {
+      name: "style",
+      executeOnLoad: true,
+      options: [
+        { name: "nodeScale", defaultVal: 1.0, type: "number", min: 0.1, max: 5.0 },
+        { name: "orbitOpacity", defaultVal: 0.4, type: "number", min: 0.0, max: 1.0 },
+        { name: "fontSize", defaultVal: 2, type: "number", min: 0.5, max: 10 },
+        { name: "spread", defaultVal: 1.0, type: "number", min: 0.2, max: 3.0 },
+      ],
+    },
+    {
+      name: "colors",
+      executeOnLoad: true,
+      options: [
+        { name: "orbitHue", defaultVal: 345, type: "number", min: 0, max: 360 },
+        { name: "equationHue", defaultVal: 30, type: "number", min: 0, max: 360 },
+      ],
+    },
   ];
 
   constructor(container) {
@@ -19,6 +37,12 @@ class MathOrbitalMap extends ModuleBase {
     this.svg = null;
     this.concepts = [];
     this.orbits = [];
+    this._nodeScale = 1.0;
+    this._orbitOpacity = 0.4;
+    this._fontSize = 2;
+    this._spread = 1.0;
+    this._orbitHue = 345;
+    this._equationHue = 30;
     this.init();
   }
 
@@ -295,13 +319,45 @@ class MathOrbitalMap extends ModuleBase {
       concept.y = rng() * containerHeight * 0.8 + containerHeight * 0.1;
     });
 
-    if (this.svg) {
-      this.svg.selectAll("*").remove();
-      this.createVisualization();
-    }
+    this._refresh();
+  }
+
+  style({ nodeScale = 1.0, orbitOpacity = 0.4, fontSize = 2, spread = 1.0 } = {}) {
+    this._nodeScale = Number(nodeScale);
+    this._orbitOpacity = Number(orbitOpacity);
+    this._fontSize = Number(fontSize);
+    this._spread = Number(spread);
+    this._refresh();
+  }
+
+  colors({ orbitHue = 345, equationHue = 30 } = {}) {
+    this._orbitHue = Number(orbitHue);
+    this._equationHue = Number(equationHue);
+    this._refresh();
+  }
+
+  _refresh() {
+    if (!this.svg) return;
+    this.svg.selectAll("*").remove();
+    this.createVisualization();
   }
 
   createVisualization() {
+    const containerWidth = this.elem.clientWidth;
+    const containerHeight = this.elem.clientHeight;
+    const cx = containerWidth / 2;
+    const cy = containerHeight / 2;
+    const sp = this._spread;
+
+    const pos = (c) => ({
+      x: cx + (c.x - cx) * sp,
+      y: cy + (c.y - cy) * sp,
+    });
+
+    const orbitColor = `hsl(${this._orbitHue}, 100%, 60%)`;
+    const eqColor = `hsl(${this._equationHue}, 100%, 60%)`;
+    const fs = this._fontSize;
+
     const orbitGroup = this.svg.append("g").attr("class", "orbits");
 
     this.orbits.forEach((orbit) => {
@@ -309,28 +365,27 @@ class MathOrbitalMap extends ModuleBase {
       const target = this.concepts.find((c) => c.id === orbit.target);
 
       if (source && target) {
-        const dx = target.x - source.x;
-        const dy = target.y - source.y;
+        const s = pos(source);
+        const t = pos(target);
+        const dx = t.x - s.x;
+        const dy = t.y - s.y;
         const dr = Math.sqrt(dx * dx + dy * dy) * 1.2;
 
         orbitGroup
           .append("path")
-          .attr(
-            "d",
-            `M${source.x},${source.y}A${dr},${dr} 0 0,1 ${target.x},${target.y}`
-          )
+          .attr("d", `M${s.x},${s.y}A${dr},${dr} 0 0,1 ${t.x},${t.y}`)
           .attr("fill", "none")
-          .attr("stroke", "#ff3366")
+          .attr("stroke", orbitColor)
           .attr("stroke-width", 0.75)
-          .attr("opacity", 0.4);
+          .attr("opacity", this._orbitOpacity);
 
         orbitGroup
           .append("text")
-          .attr("x", (source.x + target.x) / 2)
-          .attr("y", (source.y + target.y) / 2 - 8)
+          .attr("x", (s.x + t.x) / 2)
+          .attr("y", (s.y + t.y) / 2 - 8)
           .attr("text-anchor", "middle")
-          .attr("fill", "#ff9933")
-          .attr("font-size", "2px")
+          .attr("fill", eqColor)
+          .attr("font-size", `${fs}px`)
           .text(orbit.equation);
       }
     });
@@ -338,29 +393,31 @@ class MathOrbitalMap extends ModuleBase {
     const nodeGroup = this.svg.append("g").attr("class", "nodes");
 
     this.concepts.forEach((concept) => {
+      const p = pos(concept);
+
       nodeGroup
         .append("circle")
-        .attr("cx", concept.x)
-        .attr("cy", concept.y)
-        .attr("r", 1)
+        .attr("cx", p.x)
+        .attr("cy", p.y)
+        .attr("r", this._nodeScale)
         .attr("fill", "#ffffff");
 
       nodeGroup
         .append("text")
-        .attr("x", concept.x)
-        .attr("y", concept.y - 8)
+        .attr("x", p.x)
+        .attr("y", p.y - 8 * this._nodeScale)
         .attr("text-anchor", "middle")
         .attr("fill", "#ffffff")
-        .attr("font-size", "2px")
+        .attr("font-size", `${fs}px`)
         .text(concept.name);
 
       nodeGroup
         .append("text")
-        .attr("x", concept.x)
-        .attr("y", concept.y + 12)
+        .attr("x", p.x)
+        .attr("y", p.y + 12 * this._nodeScale)
         .attr("text-anchor", "middle")
-        .attr("fill", "#ff9933")
-        .attr("font-size", "2px")
+        .attr("fill", eqColor)
+        .attr("font-size", `${fs}px`)
         .text(concept.type);
     });
   }

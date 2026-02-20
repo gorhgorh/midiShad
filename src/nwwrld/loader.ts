@@ -1,6 +1,14 @@
 import { BaseThreeJsModule } from './BaseThreeJsModule'
 import type { ModuleDefinition, ParamDescriptor, OptionDescriptor, ActionDescriptor } from '../types'
 
+/** Convert PascalCase/camelCase module ID to kebab-case URL slug */
+export function toKebab(id: string): string {
+  return id
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase()
+}
+
 // Lazy dynamic importers — Vite resolves the file list at build time,
 // but each module is fetched only when we call the loader function.
 // Globals (ModuleBase, THREE, etc.) are already on globalThis via register.ts.

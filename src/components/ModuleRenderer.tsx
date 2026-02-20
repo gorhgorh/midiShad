@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useModuleStore } from '../store/moduleStore'
 import { useLfoStore } from '../store/lfoStore'
 import { useClockStore } from '../store/clockStore'
-import { computeLfo } from '../lfo/engine'
+import { computeLfosInOrder } from '../lfo/graph'
 import type { ModuleInstance, ModuleDefinition } from '../types'
 
 /** Maps base_* param names to the arg name the base method expects */
@@ -190,9 +190,12 @@ export function ModuleRenderer() {
       const activeModule = activeModRef.current
       if (!instance || !activeModule) return
 
-      const { lfos, assignments, baseValues } = useLfoStore.getState()
+      const { lfos, assignments, baseValues, lfoParamMods, lfoParamBaseValues, ccValues } = useLfoStore.getState()
       const { bpm } = useClockStore.getState()
       const elapsed = performance.now() / 1000
+
+      // Pre-compute all 4 LFO outputs in dependency order
+      const lfoOutputs = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
 
       for (const param of activeModule.params) {
         const lfoId = assignments[param.name]
@@ -201,21 +204,41 @@ export function ModuleRenderer() {
         const lfo = lfos[lfoId]
         if (!lfo) continue
 
-        const lfoOutput = computeLfo(lfo, bpm, elapsed)
+        const lfoOutput = lfoOutputs[lfoId]
         const base = baseValues[param.name] ?? param.default
         const range = param.max - param.min
 
         let val: number
         if (lfo.bipolar) {
-          // Oscillate ± around base value
           val = base + lfoOutput * range
         } else {
-          // Unipolar: sweep from param.min to param.min + lfoOutput * range
           val = param.min + lfoOutput * range
         }
 
         val = Math.max(param.min, Math.min(param.max, val))
         useModuleStore.getState().setParamValue(param.name, val)
+      }
+
+      // Boolean options: LFO toggles with 10%/90% threshold
+      for (const opt of activeModule.options) {
+        if (opt.type !== 'boolean') continue
+        const lfoId = assignments[opt.name]
+        if (!lfoId) continue
+
+        const lfo = lfos[lfoId]
+        if (!lfo) continue
+
+        const lfoOutput = lfoOutputs[lfoId]
+        const s = lfo.strength || 1
+        const normalized = lfo.bipolar
+          ? (lfoOutput / s + 1) / 2
+          : lfoOutput / s
+        const current = useModuleStore.getState().optionValues[opt.name]
+        if (normalized < 0.1 && current !== false) {
+          useModuleStore.getState().setOptionValue(opt.name, false)
+        } else if (normalized > 0.9 && current !== true) {
+          useModuleStore.getState().setOptionValue(opt.name, true)
+        }
       }
     }
 
@@ -228,7 +251,7 @@ export function ModuleRenderer() {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 w-screen h-screen z-0 overflow-hidden bg-black"
+      className="module-container fixed inset-0 w-screen h-screen z-0 overflow-hidden bg-black"
     />
   )
 }

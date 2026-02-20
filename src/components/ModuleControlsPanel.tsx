@@ -23,7 +23,7 @@ function SectionHeader({ label, open, onToggle }: { label: string; open: boolean
   return (
     <CollapsibleTrigger
       onClick={onToggle}
-      className="flex w-full items-center gap-1 py-2 text-xs font-medium text-white/70 uppercase tracking-wide hover:text-white transition-colors cursor-pointer border-b border-white/10 mb-2"
+      className="flex w-full items-center gap-1.5 py-2.5 text-xs font-medium text-white/70 uppercase tracking-wide hover:text-white transition-colors cursor-pointer border-b border-white/10 mb-2"
     >
       <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} />
       {label}
@@ -68,7 +68,7 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
       {/* Drag handle header */}
       <div
         data-drag-handle
-        className="flex items-center gap-1 px-2 py-2 border-b border-border cursor-grab active:cursor-grabbing select-none"
+        className="flex items-center gap-1.5 py-2.5 -mx-2 px-2 border-b border-border cursor-grab active:cursor-grabbing select-none"
       >
         <GripVertical className="h-3.5 w-3.5 text-white/30 shrink-0" />
         <button
@@ -117,12 +117,12 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
         </Popover>
       </div>
 
-      <div className="px-4 py-3 space-y-3">
+      <div className="pt-4 space-y-4 px-1">
         {/* Module params section */}
         {(moduleParams.length > 0 || activeModule?.options.length || moduleActions.length > 0) && (
           <Collapsible open={moduleOpen} onOpenChange={setModuleOpen}>
             <SectionHeader label="Module" open={moduleOpen} onToggle={() => setModuleOpen(!moduleOpen)} />
-            <CollapsibleContent className="pt-2">
+            <CollapsibleContent className="pt-3 px-0.5">
               <ParamMappingList
                 params={moduleParams}
                 options={activeModule?.options ?? []}
@@ -136,7 +136,7 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
         {(baseParams.length > 0 || baseActions.length > 0) && (
           <Collapsible open={transformOpen} onOpenChange={setTransformOpen}>
             <SectionHeader label="Transform" open={transformOpen} onToggle={() => setTransformOpen(!transformOpen)} />
-            <CollapsibleContent className="pt-2">
+            <CollapsibleContent className="pt-3 px-0.5">
               <ParamMappingList
                 params={baseParams}
                 options={[]}
@@ -149,7 +149,7 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
         {/* LFO section */}
         <Collapsible open={lfoOpen} onOpenChange={setLfoOpen}>
           <SectionHeader label="LFO" open={lfoOpen} onToggle={() => setLfoOpen(!lfoOpen)} />
-          <CollapsibleContent className="pt-2">
+          <CollapsibleContent className="pt-3 px-0.5">
             <LfoPanel />
           </CollapsibleContent>
         </Collapsible>

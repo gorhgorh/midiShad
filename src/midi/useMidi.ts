@@ -87,7 +87,22 @@ export function useMidi() {
       const deviceId = useMidiStore.getState().selectedDeviceId
       if (!deviceId) return
 
-      // Learn mode
+      // LFO param CC learn mode (separate from module param learn)
+      const { lfoLearnTarget } = useLfoStore.getState()
+      if (lfoLearnTarget) {
+        if (msg.value === 64) return // Skip relative knob reset
+        // lfoLearnTarget is like "lfo1.strength" — parse it
+        const dot = lfoLearnTarget.indexOf('.')
+        if (dot !== -1) {
+          const lfoId = lfoLearnTarget.substring(0, dot) as import('../store/lfoStore').LfoSlotId
+          const param = lfoLearnTarget.substring(dot + 1) as import('../lfo/engine').LfoParamName
+          useLfoStore.getState().setLfoParamMod(lfoId, param, { type: 'cc', ccNumber: msg.cc })
+          useLfoStore.getState().setLfoLearnTarget(null)
+        }
+        return
+      }
+
+      // Module param learn mode
       const { learnTarget } = useMidiStore.getState()
       if (learnTarget) {
         // Skip 64 reset pulses from relative knobs
@@ -114,6 +129,9 @@ export function useMidi() {
         }
         return
       }
+
+      // Track CC value for LFO param modulation
+      useLfoStore.getState().setCcValue(msg.cc, msg.value)
 
       // Normal mode: find param mapped to this CC and update
       const mapping = getMappingsForDevice(deviceId)
