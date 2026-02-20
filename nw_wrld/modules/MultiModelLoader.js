@@ -12,7 +12,7 @@ class MultiModelLoader extends BaseThreeJsModule {
       options: [
         {
           name: "models",
-          defaultVal: '["models/cube.obj","models/sphere.obj"]',
+          defaultVal: '["models/a.glb","models/b.glb","models/c.glb"]',
           type: "text",
         },
         { name: "scale", defaultVal: 1.0, type: "number" },
@@ -25,7 +25,7 @@ class MultiModelLoader extends BaseThreeJsModule {
       options: [
         {
           name: "indexesJson",
-          defaultVal: "[0,2]",
+          defaultVal: "[0, 1, 2]",
           type: "text",
         },
       ],
@@ -36,7 +36,7 @@ class MultiModelLoader extends BaseThreeJsModule {
       options: [
         {
           name: "offsetsJson",
-          defaultVal: "[[0,0,0],[1,0,0],[0,1,0]]",
+          defaultVal: "[[0,0,0],[-1,0,0],[1,0,0]]",
           type: "text",
         },
       ],
@@ -47,8 +47,9 @@ class MultiModelLoader extends BaseThreeJsModule {
     super(container);
     if (!THREE) return;
     this.name = MultiModelLoader.name;
-    this.loadedModels = [];
     this.lights = [];
+    this.loadedModels = [];
+    this.loadedURLModels = {};
     this.init();
   }
 
@@ -101,14 +102,6 @@ class MultiModelLoader extends BaseThreeJsModule {
     }
   }
 
-  clearLoadedModel() {
-    // Only clear the currently active model for single-model logic
-  }
-
-  disposeObject3D(object) {
-    // Only used if we ever support removing a single model
-  }
-
   onModelLoaded(object3d, scale) {
     // Only used if we ever focus a single model
   }
@@ -134,62 +127,87 @@ class MultiModelLoader extends BaseThreeJsModule {
       return null;
     }
 
-    // Clean up existing models (optional)
-    this.clearLoadedModel();
-
     const onError = (error) => {
       console.error("[MultiModelLoader] Failed to load model:", error);
     };
 
-    if (ext === "gltf" || ext === "glb") {
-      loader.load(
-        url,
-        (gltf) => {
-          this.loadedModels.push(gltf.scene || gltf);
-          this.setModel(this.loadedModels[this.loadedModels.length - 1]);
-          console.log(`Loaded model: ${safePath}`);
-        },
-        undefined,
-        onError,
-      );
-      return this.loadedModels[this.loadedModels.length - 1] || null;
-    }
+    let model = this.loadedURLModels[url];
 
-    if (ext === "stl") {
-      loader.load(
-        url,
-        (geometry) => {
-          if (geometry?.computeVertexNormals) geometry.computeVertexNormals();
-          const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
-          const mesh = new THREE.Mesh(geometry, material);
-          this.loadedModels.push(mesh);
-          this.setModel(this.loadedModels[this.loadedModels.length - 1]);
-          console.log(`Loaded model: ${safePath}`);
-        },
-        undefined,
-        onError,
-      );
-      return this.loadedModels[this.loadedModels.length - 1] || null;
-    }
+    if (!model) {
+      if (ext === "gltf" || ext === "glb") {
+        loader.load(
+          url,
+          (gltf) => {
+            model = gltf.scene || gltf;
 
-    loader.load(
-      url,
-      (obj) => {
-        this.loadedModels.push(obj);
-        this.setModel(this.loadedModels[this.loadedModels.length - 1]);
-        console.log(`Loaded model: ${safePath}`);
-      },
-      undefined,
-      onError,
-    );
-    return this.loadedModels[this.loadedModels.length - 1] || null;
+            this.setModel(model);
+            this.loadedURLModels[url] = model;
+            this.loadedModels.push(model);
+
+            this.applyScale(scale);
+
+            console.log(`Loaded GLTF model: ${safePath}`);
+
+            return model || null;
+          },
+          undefined,
+          onError,
+        );
+      }
+
+      if (ext === "stl") {
+        loader.load(
+          url,
+          (geometry) => {
+            if (geometry?.computeVertexNormals) geometry.computeVertexNormals();
+            const material = new THREE.MeshStandardMaterial({
+              color: 0xffffff,
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            model = mesh;
+
+            this.setModel(model);
+            this.loadedURLModels[url] = model;
+            this.loadedModels.push(model);
+
+            this.applyScale(scale);
+
+            console.log(`Loaded STL model: ${safePath}`);
+
+            return model || null;
+          },
+          undefined,
+          onError,
+        );
+      }
+
+      if (ext === "obj") {
+        loader.load(
+          url,
+          (obj) => {
+            model = obj;
+
+            this.setModel(model);
+            this.loadedURLModels[url] = model;
+            this.loadedModels.push(model);
+
+            this.applyScale(scale);
+
+            console.log(`Loaded OBJ model: ${safePath}`);
+
+            return model || null;
+          },
+          undefined,
+          onError,
+        );
+      }
+    } else {
+      this.setModel(model);
+      return model;
+    }
   }
 
-  loadModels({
-    models = '["models/cube.obj","models/sphere.obj"]',
-    scale = 1.0,
-    color = "#ffffff",
-  } = {}) {
+  loadModels({ models = "[]", scale = 1.0, color = "#ffffff" } = {}) {
     if (!models || models === "") {
       console.warn("[MultiModelLoader] No models specified.");
       return;
@@ -198,7 +216,7 @@ class MultiModelLoader extends BaseThreeJsModule {
     const modelPaths = Array.isArray(models)
       ? models
       : JSON.parse(models) || [];
-    this.loadedModels = [];
+    // this.loadedModels = [];
 
     for (const path of modelPaths) {
       this.loadSingleModel(path, scale);
@@ -207,6 +225,13 @@ class MultiModelLoader extends BaseThreeJsModule {
     // Apply global color if set
     if (this.loadedModels.length > 0 && this.loadedModels[0]) {
       this.applyColor(color);
+    }
+  }
+
+  applyScale(scale) {
+    for (const model of this.loadedModels) {
+      if (!model) continue;
+      model.scale.set(scale, scale, scale);
     }
   }
 
@@ -234,34 +259,24 @@ class MultiModelLoader extends BaseThreeJsModule {
    * Toggle visibility of models by indexes.
    * Parse the JSON string into an array of indices to show.
    */
-  toggleModel({ indexesJson = "[0,2]" } = {}) {
+  toggleModel({ indexesJson = "[0,1]" } = {}) {
     // Ensure a valid JSON array
     const parsedIndexes = JSON.parse(indexesJson);
 
     // Convert to Set for fast lookup
-    const indexesSet = new Set(parsedIndexes);
+    const indexesOfVisibleModels = new Set(parsedIndexes);
 
     if (!this.loadedModels || this.loadedModels.length === 0) return;
 
-    for (const [idx, model] of Object.entries(this.loadedModels)) {
-      // idx is a string; use Number(idx) below if you prefer that.
-      const isVisible = indexesSet.has(idx);
+    this.loadedModels.forEach((model, idx) => {
+      const isVisible = indexesOfVisibleModels.has(idx);
 
       if (isVisible) {
-        // Add to scene if not already present
-        if (!model.scene || !this.scene.containsObject(model)) {
-          this.scene.add(model);
-        }
-        model.userData = { visible: true };
+        model.visible = true;
       } else {
-        // Remove from scene if not already missing
-        if (this.scene.containsObject(model)) {
-          this.scene.remove(model);
-        }
-        // Optionally mark as invisible
-        model.userData = { visible: false };
+        model.visible = false;
       }
-    }
+    });
   }
 
   /**
@@ -285,7 +300,7 @@ class MultiModelLoader extends BaseThreeJsModule {
         offsets[i][2],
       );
 
-      model.position.add(vec);
+      model.position.copy(vec);
     }
   }
 
