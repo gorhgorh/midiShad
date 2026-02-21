@@ -111,35 +111,25 @@ class VideoPlayerAdvanced extends ModuleBase {
     this.name = VideoPlayerAdvanced.name;
     this.video = null;
     this.canvas = null;
-    this.ctx = null;
     this.originalMedia = null;
     this.init();
   }
 
   init() {
-    // Video
-    this.video = document.createElement("video");
-    this.video.style.cssText =
-      "width:100%;height:100%;object-fit:cover;display:block;background:#000;";
-    // Canvas (small, transparent, behind video)
-    this.canvas = document.createElement("canvas");
-    this.canvas.style.cssText =
-      "width:100%;height:100%;object-fit:cover;display:block;background:#000;";
-    this.canvas.style.position = "absolute";
-    this.canvas.style.top = "0";
-    this.canvas.style.left = "0";
-    this.canvas.style.zIndex = "1"; // above video
-    this.canvas.style.pointerEvents = "none"; // doesn't interfere with clicks
-    this.canvas.style.border = "transparent";
-
-    // Initially small; will resize with video
-    this.canvas.width = 50;
-    this.canvas.height = 50;
-
     if (this.elem) {
-      // Insert canvas before video to keep video visible
+      // Video
+      this.video = document.createElement("video");
+      this.video.style.cssText =
+        "width:100%;height:100%;object-fit:cover;display:block;background:#000;";
       this.elem.appendChild(this.video);
-      this.elem.appendChild(this.canvas);
+
+      this.canvases = [];
+      for (let index = 0; index < 4; index++) {
+        const canvas = this.buildCanvas();
+        this.canvases.push(canvas);
+        this.elem.appendChild(canvas);
+      }
+      // Insert canvas before video to keep video visible
       this.video.focus();
     }
 
@@ -156,9 +146,18 @@ class VideoPlayerAdvanced extends ModuleBase {
     this.video.addEventListener("loadeddata", () => {
       this._connectVideo();
     });
+  }
 
-    // Apply default blur (CSS)
-    this.canvas.style.filter = "blur(0px)";
+  buildCanvas() {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText =
+      "width:100%;height:100%;object-fit:cover;display:none;background:#000;";
+    canvas.style.position = "absolute";
+    canvas.style.top = "0";
+    canvas.style.left = "0";
+    canvas.style.pointerEvents = "none";
+    canvas.style.border = "transparent";
+    return canvas;
   }
 
   _connectVideo() {
@@ -214,19 +213,37 @@ class VideoPlayerAdvanced extends ModuleBase {
   }
 
   updateCanvas = (now, metadata) => {
-    const vid = this.video;
-    this._updateCanvas(vid);
+    this._updateCanvas(
+      this.video,
+      this.video.videoWidth,
+      this.video.videoHeight,
+    );
+    // const doc = document;
+    // this._updateCanvas(
+    //   document.body,
+    //   document.body.width,
+    //   document.body.height,
+    // );
   };
 
-  _updateCanvas(vid) {
-    if (!vid || !this.canvas) return;
+  _updateCanvas(vid, w, h) {
+    if (!vid) return;
 
-    this.canvas.width = vid.videoWidth;
-    this.canvas.height = vid.videoHeight;
+    const canvas = this.canvases.shift();
 
-    this.ctx = this.canvas.getContext("2d");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.style.display = "block";
 
-    this.ctx.drawImage(vid, 0, 0, vid.videoWidth, vid.videoHeight);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(vid, 0, 0, w, h);
+
+    this.canvases.push(canvas);
+
+    for (let index = 0; index < this.canvases.length; index++) {
+      const canvas = this.canvases[index];
+      canvas.style.zIndex = String(index + 1);
+    }
 
     vid.requestVideoFrameCallback(this.updateCanvas);
   }
@@ -238,15 +255,24 @@ class VideoPlayerAdvanced extends ModuleBase {
   }
 
   canvasOpacity({ opacity = 1.0 } = {}) {
-    this.canvas.style.opacity = String(opacity);
+    for (let index = 0; index < this.canvases.length; index++) {
+      const canvas = this.canvases[index];
+      canvas.style.opacity = String(opacity);
+    }
   }
 
   canvasBlur({ blur = 0.0 } = {}) {
-    this.canvas.style.filter = `blur(${blur}px)`;
+    for (let index = 0; index < this.canvases.length; index++) {
+      const canvas = this.canvases[index];
+      canvas.style.filter = `blur(${blur * (index + 1)}px)`;
+    }
   }
 
   canvasBlendMode(blend) {
-    this.canvas.style.mixBlendMode = blend.blendMode;
+    for (let index = 0; index < this.canvases.length; index++) {
+      const canvas = this.canvases[index];
+      canvas.style.mixBlendMode = blend.blendMode;
+    }
   }
 
   static get MIN_VIDEO_READY() {
