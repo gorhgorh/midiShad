@@ -20,7 +20,9 @@ const SHAPES: { value: LfoShape; label: string }[] = [
   { value: 'perlin', label: 'Perl' },
 ]
 
-const DIVIDERS = DIVIDER_OPTIONS
+const SUB_DIVIDERS = DIVIDER_OPTIONS.filter(d => d.value < 1)
+const MULTIPLIERS = DIVIDER_OPTIONS.filter(d => d.value > 1)
+type DivTab = 'div' | 'none' | 'mult'
 
 const LFO_COLORS: Record<LfoSlotId, string> = {
   lfo1: '#6ee7b7',
@@ -90,6 +92,17 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
   const lfo = useLfoStore((s) => s.lfos[id])
   const setLfo = useLfoStore((s) => s.setLfo)
   const color = LFO_COLORS[id]
+
+  const [divTab, setDivTab] = useState<DivTab>(() => {
+    if (lfo.divider < 1) return 'div'
+    if (lfo.divider > 1) return 'mult'
+    return 'none'
+  })
+
+  function onDivTabClick(tab: DivTab) {
+    setDivTab(tab)
+    if (tab === 'none') setLfo(id, { divider: 1 })
+  }
 
   return (
     <div className="space-y-4 py-1">
@@ -216,23 +229,40 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
           />
         </div>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pb-1">
           <Label className="text-[10px] text-white/70">Divider</Label>
-          <div className="flex flex-wrap gap-0.5">
-            {DIVIDERS.map((d) => (
+          <ButtonGroup className="w-full">
+            {(['div', 'none', 'mult'] as const).map((tab) => (
               <Button
-                key={d.value}
+                key={tab}
                 size="xs"
                 variant="outline"
-                className={`px-1.5 min-w-0 ${lfo.divider === d.value
+                className={`flex-1 ${divTab === tab
                   ? 'bg-white/15 text-white border-white/20'
-                  : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}`}
-                onClick={() => setLfo(id, { divider: d.value })}
+                  : 'bg-black text-white/50 border-white/10 hover:bg-white/10 hover:text-white'}`}
+                onClick={() => onDivTabClick(tab)}
               >
-                {d.label}
+                {tab === 'div' ? 'Div' : tab === 'none' ? '1' : 'Mult'}
               </Button>
             ))}
-          </div>
+          </ButtonGroup>
+          {divTab !== 'none' && (
+            <div className="grid grid-cols-6 gap-1 pt-1">
+              {(divTab === 'div' ? SUB_DIVIDERS : MULTIPLIERS).map((d) => (
+                <Button
+                  key={d.value}
+                  size="xs"
+                  variant="outline"
+                  className={`w-full px-0 ${lfo.divider === d.value
+                    ? 'bg-white/15 text-white border-white/20'
+                    : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}`}
+                  onClick={() => setLfo(id, { divider: d.value })}
+                >
+                  {d.label}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

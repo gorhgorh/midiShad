@@ -78,8 +78,6 @@ export function loadPersisted() {
     // Legacy LFO configs migration
     const lfoRaw = localStorage.getItem(KEYS.lfoConfigs)
     if (lfoRaw && !lfosRaw) {
-      // Old format: Record<paramName, { enabled, period }>
-      // Migrate: set assignments for enabled params to lfo1
       const oldConfigs = JSON.parse(lfoRaw)
       const assignments: Record<string, LfoSlotId | null> = {}
       for (const [paramName, cfg] of Object.entries(oldConfigs)) {
@@ -111,34 +109,26 @@ export function loadPersisted() {
   }
 }
 
-export function setupPersistence() {
-  useModuleStore.subscribe((state) => {
-    if (state.activeModule) {
-      localStorage.setItem(KEYS.module, state.activeModule.id)
-    }
-    localStorage.setItem(KEYS.paramCache, JSON.stringify(state.paramCache))
-    localStorage.setItem(KEYS.optionCache, JSON.stringify(state.optionCache))
-  })
+export function saveAll() {
+  const mod = useModuleStore.getState()
+  if (mod.activeModule) localStorage.setItem(KEYS.module, mod.activeModule.id)
+  localStorage.setItem(KEYS.paramCache, JSON.stringify(mod.paramCache))
+  localStorage.setItem(KEYS.optionCache, JSON.stringify(mod.optionCache))
 
-  useMidiStore.subscribe((state) => {
-    if (state.selectedDeviceId) {
-      localStorage.setItem(KEYS.device, state.selectedDeviceId)
-    }
-    localStorage.setItem(KEYS.mappings, JSON.stringify(state.mappings))
-    localStorage.setItem(KEYS.relativeFlags, JSON.stringify(state.relativeFlags))
-  })
+  const midi = useMidiStore.getState()
+  if (midi.selectedDeviceId) localStorage.setItem(KEYS.device, midi.selectedDeviceId)
+  localStorage.setItem(KEYS.mappings, JSON.stringify(midi.mappings))
+  localStorage.setItem(KEYS.relativeFlags, JSON.stringify(midi.relativeFlags))
 
-  useLfoStore.subscribe((state) => {
-    localStorage.setItem(KEYS.lfos, JSON.stringify(state.lfos))
-    localStorage.setItem(KEYS.lfoAssignments, JSON.stringify(state.assignments))
-    localStorage.setItem(KEYS.lfoAssignmentStrengths, JSON.stringify(state.assignmentStrengths))
-    localStorage.setItem(KEYS.lfoAssignmentDividers, JSON.stringify(state.assignmentDividers))
-    localStorage.setItem(KEYS.lfoConfigs, JSON.stringify(state.configs))
-    localStorage.setItem(KEYS.lfoParamMods, JSON.stringify(state.lfoParamMods))
-    localStorage.setItem(KEYS.lfoParamBaseValues, JSON.stringify(state.lfoParamBaseValues))
-  })
+  const lfo = useLfoStore.getState()
+  localStorage.setItem(KEYS.lfos, JSON.stringify(lfo.lfos))
+  localStorage.setItem(KEYS.lfoAssignments, JSON.stringify(lfo.assignments))
+  localStorage.setItem(KEYS.lfoAssignmentStrengths, JSON.stringify(lfo.assignmentStrengths))
+  localStorage.setItem(KEYS.lfoAssignmentDividers, JSON.stringify(lfo.assignmentDividers))
+  localStorage.setItem(KEYS.lfoConfigs, JSON.stringify(lfo.configs))
+  localStorage.setItem(KEYS.lfoParamMods, JSON.stringify(lfo.lfoParamMods))
+  localStorage.setItem(KEYS.lfoParamBaseValues, JSON.stringify(lfo.lfoParamBaseValues))
 
-  useClockStore.subscribe((state) => {
-    localStorage.setItem(KEYS.clock, JSON.stringify({ bpm: state.bpm, source: state.source }))
-  })
+  const clock = useClockStore.getState()
+  localStorage.setItem(KEYS.clock, JSON.stringify({ bpm: clock.bpm, source: clock.source }))
 }

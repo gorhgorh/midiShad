@@ -64,7 +64,7 @@ export function FloatingPanel({ children, visible, storageKey = 'midishad:panelP
     <div
       ref={panelRef}
       onMouseDown={onMouseDown}
-      className="ui-chrome fixed z-50 w-[360px] max-h-[80vh] overflow-y-auto rounded-lg border border-border bg-black/85 backdrop-blur-md shadow-xl p-5"
+      className="ui-chrome fixed z-50 w-[400px] max-h-[80vh] overflow-y-auto rounded-lg border border-border bg-black/85 backdrop-blur-md shadow-xl p-5"
       style={{ left: position.x, top: position.y }}
     >
       {children}

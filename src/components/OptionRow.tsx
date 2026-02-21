@@ -1,23 +1,13 @@
+import { AnimatePresence } from 'motion/react'
 import type { OptionDescriptor } from '../types'
 import { useModuleStore } from '../store/moduleStore'
-import { useLfoStore, LFO_SLOT_IDS, type LfoSlotId } from '../store/lfoStore'
+import { useLfoStore } from '../store/lfoStore'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { IndexSlider } from './IndexSlider'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-
-const LFO_COLORS: Record<LfoSlotId, string> = {
-  lfo1: '#6ee7b7',
-  lfo2: '#93c5fd',
-  lfo3: '#fca5a5',
-  lfo4: '#fde68a',
-}
+import { Button } from '@/components/ui/button'
+import { Settings } from 'lucide-react'
+import { ParamConfigPanel, useConfigPanel, LFO_COLORS } from './ParamConfigPanel'
 
 interface OptionRowProps {
   option: OptionDescriptor
@@ -27,7 +17,8 @@ export function OptionRow({ option }: OptionRowProps) {
   const value = useModuleStore((s) => s.optionValues[option.name] ?? option.defaultVal)
   const setOptionValue = useModuleStore((s) => s.setOptionValue)
   const lfoAssignment = useLfoStore((s) => s.assignments[option.name] ?? null)
-  const assignParam = useLfoStore((s) => s.assignParam)
+  const { openParam, toggle, close } = useConfigPanel()
+  const isConfigOpen = openParam === option.name
 
   // Options with values array: use IndexSlider for MIDI-mappability
   if (option.values && option.values.length > 0 && option.type === 'select') {
@@ -47,56 +38,61 @@ export function OptionRow({ option }: OptionRowProps) {
   }
 
   return (
-    <div className="flex items-center gap-1.5 py-1">
-      <label className="w-[80px] shrink-0 text-xs text-white/70 truncate" title={option.label}>
-        {option.label}
-      </label>
+    <div className="relative">
+      <div className="flex items-center gap-1.5 py-1">
+        <label className="w-[80px] shrink-0 text-xs text-white/70 truncate" title={option.label}>
+          {option.label}
+        </label>
 
-      {option.type === 'color' && (
-        <input
-          type="color"
-          value={String(value)}
-          onChange={(e) => setOptionValue(option.name, e.target.value)}
-          className="w-8 h-6 border border-border rounded cursor-pointer bg-transparent"
-        />
-      )}
-
-      {option.type === 'boolean' && (
-        <>
-          <Switch
-            checked={!!value}
-            onCheckedChange={(v) => setOptionValue(option.name, v)}
+        {option.type === 'color' && (
+          <input
+            type="color"
+            value={String(value)}
+            onChange={(e) => setOptionValue(option.name, e.target.value)}
+            className="w-8 h-6 border border-border rounded cursor-pointer bg-transparent"
           />
-          <Select
-            value={lfoAssignment ?? '__none__'}
-            onValueChange={(v) => assignParam(option.name, v === '__none__' ? null : v as LfoSlotId)}
-          >
-            <SelectTrigger
-              className="h-5 w-[52px] px-1 text-[10px]"
-              style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment], borderColor: LFO_COLORS[lfoAssignment] + '80' } : undefined}
-            >
-              <SelectValue placeholder="LFO" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
-              {LFO_SLOT_IDS.map((id, i) => (
-                <SelectItem key={id} value={id}>
-                  <span style={{ color: LFO_COLORS[id] }}>LFO {i + 1}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </>
-      )}
+        )}
 
-      {(option.type === 'text' || option.type === 'assetFile' || option.type === 'assetDir') && (
-        <Input
-          type="text"
-          value={String(value)}
-          onChange={(e) => setOptionValue(option.name, e.target.value)}
-          onKeyDown={(e) => e.stopPropagation()}
-          className="h-6 text-xs flex-1"
-        />
+        {option.type === 'boolean' && (
+          <>
+            <Switch
+              checked={!!value}
+              onCheckedChange={(v) => setOptionValue(option.name, v)}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 shrink-0"
+              style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment] } : { color: 'rgba(255,255,255,0.3)' }}
+              onClick={() => toggle(option.name)}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
+
+        {(option.type === 'text' || option.type === 'assetFile' || option.type === 'assetDir') && (
+          <Input
+            type="text"
+            value={String(value)}
+            onChange={(e) => setOptionValue(option.name, e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-6 text-xs flex-1"
+          />
+        )}
+      </div>
+      {option.type === 'boolean' && (
+        <AnimatePresence>
+          {isConfigOpen && (
+            <ParamConfigPanel
+              key={option.name}
+              paramName={option.name}
+              showCc={false}
+              onClose={close}
+            />
+          )}
+        </AnimatePresence>
       )}
     </div>
   )

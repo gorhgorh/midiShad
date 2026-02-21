@@ -1,5 +1,4 @@
 import { useModuleStore } from '../store/moduleStore'
-import { useMidiStore } from '../store/midiStore'
 import { ParamRow } from './ParamRow'
 import { OptionRow } from './OptionRow'
 import { Button } from '@/components/ui/button'
@@ -13,25 +12,13 @@ interface ParamMappingListProps {
 
 export function ParamMappingList({ params, options, actions }: ParamMappingListProps) {
   const callAction = useModuleStore((s) => s.callAction)
-  const deviceId = useMidiStore((s) => s.selectedDeviceId)
-  const deviceMappings = useMidiStore((s) =>
-    deviceId ? s.mappings[deviceId] : undefined
-  )
-  const deviceRelFlags = useMidiStore((s) =>
-    deviceId ? s.relativeFlags[deviceId] : undefined
-  )
 
   return (
     <div className="space-y-3">
       {params.length > 0 && (
         <div>
           {params.map((param) => (
-            <ParamRow
-              key={param.name}
-              param={param}
-              ccNumber={deviceMappings?.[param.name]}
-              isRelative={!!deviceRelFlags?.[param.name]}
-            />
+            <ParamRow key={param.name} param={param} />
           ))}
         </div>
       )}

@@ -39,7 +39,7 @@ function LfoSquare({ id }: { id: LfoSlotId }) {
       const elapsed = performance.now() / 1000
       const color = LFO_COLORS[id]
 
-      const lfoOutputs = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+      const { outputs: lfoOutputs } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
 
       const baseLfo = lfos[id]
       const effective = { ...baseLfo }

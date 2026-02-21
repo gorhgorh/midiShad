@@ -34,7 +34,7 @@ export function LfoWavePreview({ lfoId, color = '#6ee7b7' }: LfoWavePreviewProps
       const elapsed = performance.now() / 1000
 
       // Compute all LFO outputs with modulation
-      const lfoOutputs = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+      const { outputs: lfoOutputs } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
 
       // Build effective definition (with modulations applied)
       const baseLfo = lfos[lfoId]

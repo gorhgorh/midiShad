@@ -4,6 +4,7 @@ import { useMidiStore, getMappingsForDevice, isParamRelative } from '../store/mi
 import { useModuleStore } from '../store/moduleStore'
 import { useLfoStore } from '../store/lfoStore'
 import { useClockStore } from '../store/clockStore'
+import { useMidiDebugStore } from '../components/MidiDebugPanel'
 
 // MIDI clock: 24 pulses per quarter note (ppqn)
 const MIDI_CLOCK = 0xF8
@@ -58,6 +59,11 @@ export function useMidi() {
     function onMessage(e: MIDIMessageEvent) {
       const data = e.data as Uint8Array
       if (!data || data.length === 0) return
+
+      // Push to debug log (skip clock & active sensing)
+      if (data[0] !== 0xF8 && data[0] !== 0xFE) {
+        useMidiDebugStore.getState().push(Array.from(data))
+      }
 
       // Handle MIDI clock messages
       if (data[0] === MIDI_CLOCK) {
@@ -130,34 +136,42 @@ export function useMidi() {
         return
       }
 
-      // Track CC value for LFO param modulation
-      useLfoStore.getState().setCcValue(msg.cc, msg.value)
-
       // Normal mode: find param mapped to this CC and update
       const mapping = getMappingsForDevice(deviceId)
       const { activeModule, paramValues } = useModuleStore.getState()
-      if (!activeModule) return
 
-      for (const [paramName, ccNum] of Object.entries(mapping)) {
-        if (ccNum === msg.cc) {
-          const param = activeModule.params.find((p) => p.name === paramName)
-          if (!param) continue
+      // Collect all lfoStore updates into one setState call (ccValue + baseValues)
+      const lfoUpdates: Record<string, unknown> = {}
+      lfoUpdates.ccValues = { ...useLfoStore.getState().ccValues, [msg.cc]: msg.value }
 
-          let val: number
-          if (isParamRelative(deviceId, paramName)) {
-            const current = paramValues[paramName] ?? param.default
-            const next = applyRelativeCc(msg.value, current, param.min, param.max)
-            if (next === null) continue
-            val = next
-          } else {
-            val = normalizeCc(msg.value, param.min, param.max)
+      if (activeModule) {
+        const baseValueUpdates: Record<string, number> = {}
+        for (const [paramName, ccNum] of Object.entries(mapping)) {
+          if (ccNum === msg.cc) {
+            const param = activeModule.params.find((p) => p.name === paramName)
+            if (!param) continue
+
+            let val: number
+            if (isParamRelative(deviceId, paramName)) {
+              const current = paramValues[paramName] ?? param.default
+              const next = applyRelativeCc(msg.value, current, param.min, param.max)
+              if (next === null) continue
+              val = next
+            } else {
+              val = normalizeCc(msg.value, param.min, param.max)
+            }
+
+            useModuleStore.getState().setParamValue(paramName, val)
+            baseValueUpdates[paramName] = val
           }
-
-          useModuleStore.getState().setParamValue(paramName, val)
-          // Also update LFO base value so bipolar LFO centers on user's knob position
-          useLfoStore.getState().setBaseValue(paramName, val)
+        }
+        if (Object.keys(baseValueUpdates).length > 0) {
+          lfoUpdates.baseValues = { ...useLfoStore.getState().baseValues, ...baseValueUpdates }
         }
       }
+
+      // Single lfoStore update for ccValue + baseValues
+      useLfoStore.setState(lfoUpdates as Partial<ReturnType<typeof useLfoStore.getState>>)
     }
 
     input.onmidimessage = onMessage

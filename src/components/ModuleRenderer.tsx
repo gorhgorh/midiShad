@@ -226,7 +226,17 @@ export function ModuleRenderer() {
         const base = baseValues[param.name] ?? param.default
         const range = param.max - param.min
 
-        let val = base + lfoOutput * strength * range
+        // Normalize LFO to [0,1] regardless of bipolar/unipolar
+        const t = lfoOutput >= -1 && lfoOutput <= 0
+          ? (lfoOutput + 1) / 2   // bipolar negative half
+          : lfoOutput <= 1
+            ? (lfoOutput + 1) / 2 // bipolar positive half / unipolar
+            : lfoOutput
+        // At strength=0: value stays at base
+        // At strength=1: value sweeps full min→max
+        const lo = base - strength * (base - param.min)
+        const hi = base + strength * (param.max - base)
+        let val = lo + t * (hi - lo)
         val = Math.max(param.min, Math.min(param.max, val))
         paramUpdates[param.name] = val
       }

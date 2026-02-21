@@ -124,22 +124,25 @@
 }
 
 /* Scale: small */
-[data-ui-scale="small"] .ui-chrome { font-size: 14px; }
-[data-ui-scale="small"] .ui-chrome .text-\[10px\] { font-size: 12px; }
-[data-ui-scale="small"] .ui-chrome .text-\[9px\] { font-size: 11px; }
-[data-ui-scale="small"] .ui-chrome .text-xs { font-size: 13px; }
-[data-ui-scale="small"] .ui-chrome .text-sm { font-size: 14px; }
+[data-ui-scale="small"] .ui-chrome { font-size: 16px; }
+[data-ui-scale="small"] .ui-chrome .text-\[10px\] { font-size: 14px; }
+[data-ui-scale="small"] .ui-chrome .text-\[9px\] { font-size: 13px; }
+[data-ui-scale="small"] .ui-chrome .text-\[8px\] { font-size: 12px; }
+[data-ui-scale="small"] .ui-chrome .text-xs { font-size: 15px; }
+[data-ui-scale="small"] .ui-chrome .text-sm { font-size: 16px; }
 
 /* Scale: normal (default) */
-[data-ui-scale="normal"] .ui-chrome { font-size: 17px; }
-[data-ui-scale="normal"] .ui-chrome .text-\[10px\] { font-size: 15px; }
-[data-ui-scale="normal"] .ui-chrome .text-\[9px\] { font-size: 14px; }
-[data-ui-scale="normal"] .ui-chrome .text-xs { font-size: 16px; }
-[data-ui-scale="normal"] .ui-chrome .text-sm { font-size: 17px; }
+[data-ui-scale="normal"] .ui-chrome { font-size: 19px; }
+[data-ui-scale="normal"] .ui-chrome .text-\[10px\] { font-size: 17px; }
+[data-ui-scale="normal"] .ui-chrome .text-\[9px\] { font-size: 16px; }
+[data-ui-scale="normal"] .ui-chrome .text-\[8px\] { font-size: 15px; }
+[data-ui-scale="normal"] .ui-chrome .text-xs { font-size: 18px; }
+[data-ui-scale="normal"] .ui-chrome .text-sm { font-size: 19px; }
 
 /* Scale: big */
-[data-ui-scale="big"] .ui-chrome { font-size: 20px; }
-[data-ui-scale="big"] .ui-chrome .text-\[10px\] { font-size: 18px; }
-[data-ui-scale="big"] .ui-chrome .text-\[9px\] { font-size: 17px; }
-[data-ui-scale="big"] .ui-chrome .text-xs { font-size: 19px; }
-[data-ui-scale="big"] .ui-chrome .text-sm { font-size: 20px; }
+[data-ui-scale="big"] .ui-chrome { font-size: 22px; }
+[data-ui-scale="big"] .ui-chrome .text-\[10px\] { font-size: 20px; }
+[data-ui-scale="big"] .ui-chrome .text-\[9px\] { font-size: 19px; }
+[data-ui-scale="big"] .ui-chrome .text-\[8px\] { font-size: 18px; }
+[data-ui-scale="big"] .ui-chrome .text-xs { font-size: 21px; }
+[data-ui-scale="big"] .ui-chrome .text-sm { font-size: 22px; }
