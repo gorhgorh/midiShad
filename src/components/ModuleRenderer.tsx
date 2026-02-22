@@ -1,9 +1,27 @@
 import { useEffect, useRef } from 'react'
-import { useModuleStore } from '../store/moduleStore'
-import { useLfoStore } from '../store/lfoStore'
-import { useClockStore } from '../store/clockStore'
-import { computeLfo } from '../lfo/engine'
-import { computeLfosInOrder } from '../lfo/graph'
+import { appStore } from '../atoms/store'
+import {
+  activeModuleAtom,
+  paramValuesAtom,
+  optionValuesAtom,
+  callActionAtom,
+} from '../atoms/moduleAtoms'
+import {
+  lfosAtom,
+  assignmentsAtom,
+  assignmentStrengthsAtom,
+  assignmentDividersAtom,
+  baseValuesAtom,
+  lfoParamModsAtom,
+  lfoParamBaseValuesAtom,
+} from '../atoms/lfoAtoms'
+import { bpmAtom } from '../atoms/clockAtoms'
+import { computeLfo, computeLfosInOrder } from '@almst/lfo'
+import { lfoEngine } from '../lfo/instance'
+import { renderState, bumpVersion, resetRenderState } from '../render/renderState'
+import { animationManager } from '../render/AnimationManager'
+import { registerBridge, unregisterBridge } from '../render/moduleBridge'
+import { ccState } from '../render/ccState'
 import type { ModuleInstance, ModuleDefinition } from '../types'
 
 /** Maps base_* param names to the arg name the base method expects */
@@ -16,9 +34,6 @@ const BASE_ARG_MAP: Record<string, string> = {
 }
 
 function callMethod(instance: ModuleInstance, methodName: string, args: Record<string, unknown>, moduleClass?: ModuleDefinition['moduleClass']) {
-  // nw_wrld modules often shadow prototype methods with instance properties
-  // of the same name (e.g. this.color = "#fff" shadows color({color}){…}).
-  // Look up the method on the class prototype first to bypass shadowing.
   let fn: unknown
   if (moduleClass) {
     fn = moduleClass.prototype[methodName]
@@ -45,10 +60,21 @@ export function ModuleRenderer() {
   const containerRef = useRef<HTMLDivElement>(null)
   const instanceRef = useRef<ModuleInstance | null>(null)
   const activeModRef = useRef<ModuleDefinition | null>(null)
-  const rafRef = useRef<number | null>(null)
   const visibleRef = useRef(true)
 
-  // Mount / swap module instances + react to all store changes
+  // LFO state cache — atom values cached in refs to avoid per-frame appStore.get()
+  const lfoStateRef = useRef({
+    lfos: appStore.get(lfosAtom),
+    assignments: appStore.get(assignmentsAtom),
+    assignmentStrengths: appStore.get(assignmentStrengthsAtom),
+    assignmentDividers: appStore.get(assignmentDividersAtom),
+    baseValues: appStore.get(baseValuesAtom),
+    lfoParamMods: appStore.get(lfoParamModsAtom),
+    lfoParamBaseValues: appStore.get(lfoParamBaseValuesAtom),
+    bpm: appStore.get(bpmAtom),
+  })
+
+  // Mount / swap module instances + react to user/MIDI store changes
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -59,20 +85,20 @@ export function ModuleRenderer() {
 
     function instantiate(activeModule: ModuleDefinition) {
       if (!container) return
-      // Destroy previous
       if (instanceRef.current) {
         instanceRef.current.destroy()
         instanceRef.current = null
       }
       activeModRef.current = activeModule
       visibleRef.current = true
+      resetRenderState()
 
       try {
         const instance = new activeModule.moduleClass(container) as ModuleInstance
         instanceRef.current = instance
 
-        // Execute executeOnLoad methods with current values
-        const { paramValues, optionValues } = useModuleStore.getState()
+        const paramValues = appStore.get(paramValuesAtom)
+        const optionValues = appStore.get(optionValuesAtom)
         for (const eol of activeModule.executeOnLoadMethods) {
           const args: Record<string, unknown> = { ...eol.defaults }
           for (const key of Object.keys(args)) {
@@ -85,13 +111,11 @@ export function ModuleRenderer() {
         console.error('[ModuleRenderer] Failed to instantiate module:', err)
       }
 
-      // Expose action caller so UI buttons can invoke methods on the live instance
-      useModuleStore.getState().setCallAction((methodName: string) => {
+      appStore.set(callActionAtom, (methodName: string) => {
         const inst = instanceRef.current
         const mod = activeModRef.current
         if (!inst || !mod) return
 
-        // Handle visibility toggle
         if (methodName === 'base_toggleVisibility') {
           visibleRef.current = !visibleRef.current
           if (visibleRef.current) inst.show()
@@ -103,25 +127,54 @@ export function ModuleRenderer() {
       })
     }
 
-    // Fire immediately with current state
-    const initialState = useModuleStore.getState()
-    if (initialState.activeModule) {
-      prevModuleId = initialState.activeModule.id
-      prevParamValues = initialState.paramValues
-      prevOptionValues = initialState.optionValues
-      instantiate(initialState.activeModule)
+    // --- Bridge: MIDI hooks call this directly to update module ---
+    function bridgeFn(paramUpdates: Record<string, number>, baseUpdates: Record<string, number>) {
+      const instance = instanceRef.current
+      const activeModule = activeModRef.current
+      if (!instance || !activeModule) return
+
+      // Group by method and call module methods directly
+      const batched: Record<string, Record<string, unknown>> = {}
+      for (const param of activeModule.params) {
+        if (param.name in paramUpdates) {
+          const key = param.methodName
+          if (!batched[key]) batched[key] = {}
+          batched[key][param.name] = paramUpdates[param.name]
+        }
+      }
+      for (const [method, args] of Object.entries(batched)) {
+        const isBase = Object.keys(args).some((k) => k in BASE_ARG_MAP)
+        const remapped = isBase ? remapBaseArgs(args) : args
+        callMethod(instance, method, remapped, activeModule.moduleClass)
+      }
+
+      // Update LFO base values directly (no Jotai)
+      Object.assign(lfoStateRef.current.baseValues, baseUpdates)
+
+      // Update render state for UI readout
+      Object.assign(renderState.modulatedParams, paramUpdates)
+      bumpVersion()
     }
 
-    const unsub = useModuleStore.subscribe((state) => {
-      const instance = instanceRef.current
-      const activeModule = state.activeModule
+    registerBridge(bridgeFn)
 
-      // Module changed?
+    // Fire immediately with current state
+    const initialActiveModule = appStore.get(activeModuleAtom)
+    if (initialActiveModule) {
+      prevModuleId = initialActiveModule.id
+      prevParamValues = appStore.get(paramValuesAtom)
+      prevOptionValues = appStore.get(optionValuesAtom)
+      instantiate(initialActiveModule)
+    }
+
+    // Subscribe to activeModule changes
+    const unsubModule = appStore.sub(activeModuleAtom, () => {
+      const activeModule = appStore.get(activeModuleAtom)
       const moduleId = activeModule?.id ?? null
       if (moduleId !== prevModuleId) {
         prevModuleId = moduleId
-        prevParamValues = state.paramValues
-        prevOptionValues = state.optionValues
+        prevParamValues = appStore.get(paramValuesAtom)
+        prevOptionValues = appStore.get(optionValuesAtom)
         if (activeModule) {
           instantiate(activeModule)
         } else {
@@ -131,40 +184,49 @@ export function ModuleRenderer() {
           }
           activeModRef.current = null
         }
-        return
       }
+    })
 
+    // Subscribe to paramValues changes (UI slider-driven changes only)
+    const unsubParams = appStore.sub(paramValuesAtom, () => {
+      const instance = instanceRef.current
+      const activeModule = activeModRef.current
       if (!instance || !activeModule) return
 
-      // Param values changed? Batch by methodName so methods that accept
-      // multiple params (e.g. size({x, y})) get all values in one call.
-      if (state.paramValues !== prevParamValues) {
-        prevParamValues = state.paramValues
+      const paramValues = appStore.get(paramValuesAtom)
+      if (paramValues !== prevParamValues) {
+        prevParamValues = paramValues
         const batched: Record<string, Record<string, unknown>> = {}
         for (const param of activeModule.params) {
-          if (param.name in state.paramValues) {
+          if (param.name in paramValues) {
             const key = param.methodName
             if (!batched[key]) batched[key] = {}
-            batched[key][param.name] = state.paramValues[param.name]
+            batched[key][param.name] = paramValues[param.name]
           }
         }
         for (const [method, args] of Object.entries(batched)) {
-          // Base methods need arg remapping (base_offsetX → x, etc.)
           const isBase = Object.keys(args).some((k) => k in BASE_ARG_MAP)
           const remapped = isBase ? remapBaseArgs(args) : args
           callMethod(instance, method, remapped, activeModule.moduleClass)
         }
       }
+    })
 
-      // Option values changed? Batch by methodName
-      if (state.optionValues !== prevOptionValues) {
-        prevOptionValues = state.optionValues
+    // Subscribe to optionValues changes
+    const unsubOptions = appStore.sub(optionValuesAtom, () => {
+      const instance = instanceRef.current
+      const activeModule = activeModRef.current
+      if (!instance || !activeModule) return
+
+      const optionValues = appStore.get(optionValuesAtom)
+      if (optionValues !== prevOptionValues) {
+        prevOptionValues = optionValues
         const batched: Record<string, Record<string, unknown>> = {}
         for (const opt of activeModule.options) {
-          if (opt.name in state.optionValues) {
+          if (opt.name in optionValues) {
             const key = opt.methodName
             if (!batched[key]) batched[key] = {}
-            batched[key][opt.name] = state.optionValues[opt.name]
+            batched[key][opt.name] = optionValues[opt.name]
           }
         }
         for (const [method, args] of Object.entries(batched)) {
@@ -174,8 +236,11 @@ export function ModuleRenderer() {
     })
 
     return () => {
-      unsub()
-      useModuleStore.getState().setCallAction(null)
+      unregisterBridge()
+      unsubModule()
+      unsubParams()
+      unsubOptions()
+      appStore.set(callActionAtom, null)
       if (instanceRef.current) {
         instanceRef.current.destroy()
         instanceRef.current = null
@@ -183,27 +248,40 @@ export function ModuleRenderer() {
     }
   }, [])
 
-  // LFO animation loop
+  // Subscribe to LFO-related atom changes and update cache
   useEffect(() => {
-    function tick() {
-      rafRef.current = requestAnimationFrame(tick)
+    const unsubs = [
+      appStore.sub(lfosAtom, () => { lfoStateRef.current.lfos = appStore.get(lfosAtom) }),
+      appStore.sub(assignmentsAtom, () => { lfoStateRef.current.assignments = appStore.get(assignmentsAtom) }),
+      appStore.sub(assignmentStrengthsAtom, () => { lfoStateRef.current.assignmentStrengths = appStore.get(assignmentStrengthsAtom) }),
+      appStore.sub(assignmentDividersAtom, () => { lfoStateRef.current.assignmentDividers = appStore.get(assignmentDividersAtom) }),
+      appStore.sub(baseValuesAtom, () => { lfoStateRef.current.baseValues = appStore.get(baseValuesAtom) }),
+      appStore.sub(lfoParamModsAtom, () => { lfoStateRef.current.lfoParamMods = appStore.get(lfoParamModsAtom) }),
+      appStore.sub(lfoParamBaseValuesAtom, () => { lfoStateRef.current.lfoParamBaseValues = appStore.get(lfoParamBaseValuesAtom) }),
+      appStore.sub(bpmAtom, () => { lfoStateRef.current.bpm = appStore.get(bpmAtom) }),
+    ]
+    return () => unsubs.forEach(u => u())
+  }, [])
+
+  // LFO animation loop — writes to renderState + calls module methods directly
+  useEffect(() => {
+    function lfoTick() {
       const instance = instanceRef.current
       const activeModule = activeModRef.current
       if (!instance || !activeModule) return
 
-      const { lfos, assignments, assignmentStrengths, assignmentDividers, baseValues, lfoParamMods, lfoParamBaseValues, ccValues } = useLfoStore.getState()
+      // Read from cache (atoms) + ccState (mutable)
+      const { lfos, assignments, assignmentStrengths, assignmentDividers, baseValues, lfoParamMods, lfoParamBaseValues, bpm } = lfoStateRef.current
+      // CC values read directly from mutable state (zero-alloc)
+      const ccValues = ccState.ccValues
 
-      // Early exit: no assignments at all → skip everything
+      // Early exit: no assignments at all
       const assignmentKeys = Object.keys(assignments)
       if (assignmentKeys.length === 0 || assignmentKeys.every((k) => !assignments[k])) return
-
-      const { bpm } = useClockStore.getState()
       const elapsed = performance.now() / 1000
 
-      // Pre-compute all 4 LFO outputs in dependency order
-      const { outputs: lfoOutputs, effectives } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+      const { outputs: lfoOutputs, effectives } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues, lfoEngine.noiseState)
 
-      // Batch param value updates
       const paramUpdates: Record<string, number> = {}
 
       for (const param of activeModule.params) {
@@ -218,22 +296,17 @@ export function ModuleRenderer() {
         if (assignDiv === 1) {
           lfoOutput = lfoOutputs[lfoId]
         } else {
-          // Recompute with per-assignment phase multiplier
-          lfoOutput = computeLfo(effectives[lfoId], bpm, elapsed, lfoId, assignDiv)
+          lfoOutput = computeLfo(effectives[lfoId], bpm, elapsed, lfoId, lfoEngine.noiseState, assignDiv)
         }
 
         const strength = assignmentStrengths[param.name] ?? 0.5
         const base = baseValues[param.name] ?? param.default
-        const range = param.max - param.min
 
-        // Normalize LFO to [0,1] regardless of bipolar/unipolar
         const t = lfoOutput >= -1 && lfoOutput <= 0
-          ? (lfoOutput + 1) / 2   // bipolar negative half
+          ? (lfoOutput + 1) / 2
           : lfoOutput <= 1
-            ? (lfoOutput + 1) / 2 // bipolar positive half / unipolar
+            ? (lfoOutput + 1) / 2
             : lfoOutput
-        // At strength=0: value stays at base
-        // At strength=1: value sweeps full min→max
         const lo = base - strength * (base - param.min)
         const hi = base + strength * (param.max - base)
         let val = lo + t * (hi - lo)
@@ -241,14 +314,25 @@ export function ModuleRenderer() {
         paramUpdates[param.name] = val
       }
 
-      // Batch all param updates into a single setState call
       if (Object.keys(paramUpdates).length > 0) {
-        useModuleStore.setState((s) => ({
-          paramValues: { ...s.paramValues, ...paramUpdates },
-        }))
+        Object.assign(renderState.modulatedParams, paramUpdates)
+
+        const batched: Record<string, Record<string, unknown>> = {}
+        for (const param of activeModule.params) {
+          if (!(param.name in paramUpdates)) continue
+          const key = param.methodName
+          if (!batched[key]) batched[key] = {}
+          batched[key][param.name] = paramUpdates[param.name]
+        }
+        for (const [method, args] of Object.entries(batched)) {
+          const isBase = Object.keys(args).some((k) => k in BASE_ARG_MAP)
+          const remapped = isBase ? remapBaseArgs(args) : args
+          callMethod(instance, method, remapped, activeModule.moduleClass)
+        }
       }
 
       // Boolean options: LFO toggles with 10%/90% threshold
+      let optionsChanged = false
       for (const opt of activeModule.options) {
         if (opt.type !== 'boolean') continue
         const lfoId = assignments[opt.name]
@@ -261,18 +345,30 @@ export function ModuleRenderer() {
         const normalized = lfo.bipolar
           ? (lfoOutput + 1) / 2
           : lfoOutput
-        const current = useModuleStore.getState().optionValues[opt.name]
+        const current = renderState.modulatedOptions[opt.name]
         if (normalized < 0.1 && current !== false) {
-          useModuleStore.getState().setOptionValue(opt.name, false)
+          renderState.modulatedOptions[opt.name] = false
+          optionsChanged = true
+          const args: Record<string, unknown> = {}
+          args[opt.name] = false
+          callMethod(instance, opt.methodName, args, activeModule.moduleClass)
         } else if (normalized > 0.9 && current !== true) {
-          useModuleStore.getState().setOptionValue(opt.name, true)
+          renderState.modulatedOptions[opt.name] = true
+          optionsChanged = true
+          const args: Record<string, unknown> = {}
+          args[opt.name] = true
+          callMethod(instance, opt.methodName, args, activeModule.moduleClass)
         }
+      }
+
+      if (Object.keys(paramUpdates).length > 0 || optionsChanged) {
+        bumpVersion()
       }
     }
 
-    rafRef.current = requestAnimationFrame(tick)
+    animationManager.register('lfo', lfoTick)
     return () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+      animationManager.unregister('lfo')
     }
   }, [])
 

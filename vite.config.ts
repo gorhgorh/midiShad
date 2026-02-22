@@ -6,6 +6,20 @@ import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 
 export default defineConfig({
   base: '/particles/',
+  server: {
+    cors: true,
+    strictPort: true,
+    hmr: {
+      port: 5173,
+      clientPort: 5173,
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:9800',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     tailwindcss(),
     TanStackRouterVite(),

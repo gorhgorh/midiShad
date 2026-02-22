@@ -1,7 +1,10 @@
+import { useMemo } from 'react'
 import { AnimatePresence } from 'motion/react'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { selectAtom } from 'jotai/utils'
 import type { OptionDescriptor } from '../types'
-import { useModuleStore } from '../store/moduleStore'
-import { useLfoStore } from '../store/lfoStore'
+import { optionValuesAtom, setOptionValueAtom } from '../atoms/moduleAtoms'
+import { assignmentsAtom } from '../atoms/lfoAtoms'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { IndexSlider } from './IndexSlider'
@@ -14,11 +17,24 @@ interface OptionRowProps {
 }
 
 export function OptionRow({ option }: OptionRowProps) {
-  const value = useModuleStore((s) => s.optionValues[option.name] ?? option.defaultVal)
-  const setOptionValue = useModuleStore((s) => s.setOptionValue)
-  const lfoAssignment = useLfoStore((s) => s.assignments[option.name] ?? null)
+  // Use selectAtom for targeted subscriptions
+  const optionValueAtom = useMemo(
+    () => selectAtom(optionValuesAtom, (vals) => vals[option.name] ?? option.defaultVal),
+    [option.name, option.defaultVal]
+  )
+  const value = useAtomValue(optionValueAtom)
+  const _setOptionValue = useSetAtom(setOptionValueAtom)
+
+  const lfoAssignmentAtom = useMemo(
+    () => selectAtom(assignmentsAtom, (assigns) => assigns[option.name] ?? null),
+    [option.name]
+  )
+  const lfoAssignment = useAtomValue(lfoAssignmentAtom)
+
   const { openParam, toggle, close } = useConfigPanel()
   const isConfigOpen = openParam === option.name
+
+  const setOptionValue = (name: string, val: unknown) => _setOptionValue({ name, value: val })
 
   // Options with values array: use IndexSlider for MIDI-mappability
   if (option.values && option.values.length > 0 && option.type === 'select') {
@@ -63,7 +79,7 @@ export function OptionRow({ option }: OptionRowProps) {
               variant="ghost"
               size="sm"
               className="h-6 w-6 p-0 shrink-0"
-              style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment] } : { color: 'rgba(255,255,255,0.3)' }}
+              style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment as keyof typeof LFO_COLORS] } : { color: 'rgba(255,255,255,0.3)' }}
               onClick={() => toggle(option.name)}
               onMouseDown={(e) => e.stopPropagation()}
             >

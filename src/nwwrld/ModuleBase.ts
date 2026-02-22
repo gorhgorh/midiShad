@@ -1,3 +1,7 @@
+import createDebug from 'debug'
+
+const dbg = createDebug('ply:renderer')
+
 /**
  * Minimal ModuleBase shim matching the nw_wrld module contract.
  * Modules extend this class and get a DOM container element.
@@ -24,7 +28,7 @@ export class ModuleBase {
     this.externalElements = []
     this.destroyed = false
     this.show()
-    console.log('[ModuleBase] elem dimensions:', this.elem.clientWidth, 'x', this.elem.clientHeight)
+    dbg('elem dimensions: %d x %d', this.elem.clientWidth, this.elem.clientHeight)
   }
 
   _applyTransform() {

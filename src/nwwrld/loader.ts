@@ -1,5 +1,8 @@
+import createDebug from 'debug'
 import { BaseThreeJsModule } from './BaseThreeJsModule'
 import type { ModuleDefinition, ParamDescriptor, OptionDescriptor, ActionDescriptor } from '../types'
+
+const dbg = createDebug('ply:loader')
 
 /** Convert PascalCase/camelCase module ID to kebab-case URL slug */
 export function toKebab(id: string): string {
@@ -171,7 +174,7 @@ export async function loadModules(): Promise<ModuleDefinition[]> {
     }
 
     if (!ModClass || typeof ModClass !== 'function') {
-      console.warn(`[loader] ${path}: no default export class`)
+      dbg('%s: no default export class', path)
       continue
     }
 

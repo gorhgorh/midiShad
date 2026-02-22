@@ -1,15 +1,16 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { ChevronLeft, ChevronRight, RouteOff } from 'lucide-react'
-import { useModuleStore } from '@/store/moduleStore'
-import { useLfoStore } from '@/store/lfoStore'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { modulesAtom, activeModuleAtom, setActiveModuleAtom, resetModuleParamsAtom } from '@/atoms/moduleAtoms'
+import { resetAllLfosAtom } from '@/atoms/lfoAtoms'
 
 export function ModuleSelector() {
-  const modules = useModuleStore((s) => s.modules)
-  const activeModule = useModuleStore((s) => s.activeModule)
-  const setActiveModule = useModuleStore((s) => s.setActiveModule)
-  const resetModule = useModuleStore((s) => s.resetModuleParams)
-  const resetAllLfos = useLfoStore((s) => s.resetAllLfos)
+  const modules = useAtomValue(modulesAtom)
+  const activeModule = useAtomValue(activeModuleAtom)
+  const setActiveModule = useSetAtom(setActiveModuleAtom)
+  const resetModule = useSetAtom(resetModuleParamsAtom)
+  const resetAllLfos = useSetAtom(resetAllLfosAtom)
   const [open, setOpen] = useState(false)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 

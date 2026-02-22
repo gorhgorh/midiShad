@@ -1,4 +1,8 @@
 import { useState } from 'react'
+import createDebug from 'debug'
+import { useAtomValue, useSetAtom } from 'jotai'
+
+const dbg = createDebug('ply:lfo')
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { Slider } from '@/components/ui/slider'
@@ -8,8 +12,17 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { RouteOff } from 'lucide-react'
 import { LfoWavePreview } from './LfoWavePreview'
-import { useLfoStore, LFO_SLOT_IDS, type LfoSlotId } from '@/store/lfoStore'
-import { DIVIDER_OPTIONS, type LfoShape, type LfoParamName } from '@/lfo/engine'
+import {
+  lfosAtom,
+  setLfoAtom,
+  lfoParamModsAtom,
+  lfoLearnTargetAtom,
+  setLfoParamModAtom,
+  resetLfoAtom,
+  LFO_SLOT_IDS,
+  type LfoSlotId,
+} from '@/atoms/lfoAtoms'
+import { DIVIDER_OPTIONS, type LfoShape, type LfoParamName } from '@almst/lfo'
 
 const SHAPES: { value: LfoShape; label: string }[] = [
   { value: 'sine', label: 'Sin' },
@@ -40,10 +53,11 @@ const LFO_LABELS: Record<LfoSlotId, string> = {
 
 function LfoParamModRow({ lfoId, param }: { lfoId: LfoSlotId; param: LfoParamName }) {
   const modKey = `${lfoId}.${param}`
-  const mod = useLfoStore((s) => s.lfoParamMods[modKey])
-  const setLfoParamMod = useLfoStore((s) => s.setLfoParamMod)
-  const lfoLearnTarget = useLfoStore((s) => s.lfoLearnTarget)
-  const setLfoLearnTarget = useLfoStore((s) => s.setLfoLearnTarget)
+  const mods = useAtomValue(lfoParamModsAtom)
+  const mod = mods[modKey]
+  const _setLfoParamMod = useSetAtom(setLfoParamModAtom)
+  const lfoLearnTarget = useAtomValue(lfoLearnTargetAtom)
+  const setLfoLearnTarget = useSetAtom(lfoLearnTargetAtom)
 
   const isLearning = lfoLearnTarget === modKey
 
@@ -55,15 +69,15 @@ function LfoParamModRow({ lfoId, param }: { lfoId: LfoSlotId; param: LfoParamNam
 
   function handleChange(value: string) {
     if (value === 'none') {
-      setLfoParamMod(lfoId, param, null)
+      _setLfoParamMod({ lfoId, param, source: null })
       if (isLearning) setLfoLearnTarget(null)
     } else if (value === 'cc_learn') {
       setLfoLearnTarget(modKey)
-      setLfoParamMod(lfoId, param, { type: 'cc' })
+      _setLfoParamMod({ lfoId, param, source: { type: 'cc' } })
     } else {
-      const ok = setLfoParamMod(lfoId, param, { type: 'lfo', lfoId: value as LfoSlotId })
+      const ok = _setLfoParamMod({ lfoId, param, source: { type: 'lfo', lfoId: value as LfoSlotId } })
       if (!ok) {
-        console.warn(`Cycle detected: cannot route ${value} → ${lfoId}.${param}`)
+        dbg('Cycle detected: cannot route %s → %s.%s', value, lfoId, param)
       }
     }
   }
@@ -89,9 +103,12 @@ function LfoParamModRow({ lfoId, param }: { lfoId: LfoSlotId; param: LfoParamNam
 }
 
 function LfoSlotEditor({ id }: { id: LfoSlotId }) {
-  const lfo = useLfoStore((s) => s.lfos[id])
-  const setLfo = useLfoStore((s) => s.setLfo)
+  const lfos = useAtomValue(lfosAtom)
+  const lfo = lfos[id]
+  const _setLfo = useSetAtom(setLfoAtom)
   const color = LFO_COLORS[id]
+
+  const setLfo = (partial: Partial<typeof lfo>) => _setLfo({ id, partial })
 
   const [divTab, setDivTab] = useState<DivTab>(() => {
     if (lfo.divider < 1) return 'div'
@@ -101,7 +118,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
 
   function onDivTabClick(tab: DivTab) {
     setDivTab(tab)
-    if (tab === 'none') setLfo(id, { divider: 1 })
+    if (tab === 'none') setLfo({ divider: 1 })
   }
 
   return (
@@ -120,7 +137,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
               className={lfo.shape === s.value
                 ? 'bg-white/15 text-white border-white/20'
                 : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}
-              onClick={() => setLfo(id, { shape: s.value })}
+              onClick={() => setLfo({ shape: s.value })}
             >
               {s.label}
             </Button>
@@ -134,7 +151,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
           <Label className="text-[10px] text-white/70">Random Freq</Label>
           <Switch
             checked={lfo.randomFreq ?? false}
-            onCheckedChange={(v) => setLfo(id, { randomFreq: v })}
+            onCheckedChange={(v) => setLfo({ randomFreq: v })}
           />
         </div>
       )}
@@ -153,7 +170,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
           max={1}
           step={0.01}
           value={[lfo.drive ?? 0]}
-          onValueChange={([v]) => setLfo(id, { drive: v })}
+          onValueChange={([v]) => setLfo({ drive: v })}
         />
       </div>
 
@@ -174,7 +191,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
             max={1}
             step={0.01}
             value={[lfo.symmetry ?? 0.5]}
-            onValueChange={([v]) => setLfo(id, { symmetry: v })}
+            onValueChange={([v]) => setLfo({ symmetry: v })}
           />
         </div>
       )}
@@ -184,7 +201,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
         <Label className="text-[10px] text-white/70">Bipolar</Label>
         <Switch
           checked={lfo.bipolar}
-          onCheckedChange={(v) => setLfo(id, { bipolar: v })}
+          onCheckedChange={(v) => setLfo({ bipolar: v })}
         />
       </div>
 
@@ -200,7 +217,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
               className={lfo.speedMode === mode
                 ? 'bg-white/15 text-white border-white/20'
                 : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}
-              onClick={() => setLfo(id, { speedMode: mode })}
+              onClick={() => setLfo({ speedMode: mode })}
             >
               {mode.toUpperCase()}
             </Button>
@@ -222,7 +239,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
             value={lfo.hz}
             onChange={(e) => {
               const v = parseFloat(e.target.value)
-              if (!isNaN(v) && v > 0) setLfo(id, { hz: v })
+              if (!isNaN(v) && v > 0) setLfo({ hz: v })
             }}
             onKeyDown={(e) => e.stopPropagation()}
             className="h-7 text-xs"
@@ -256,7 +273,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
                   className={`w-full px-0 ${lfo.divider === d.value
                     ? 'bg-white/15 text-white border-white/20'
                     : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}`}
-                  onClick={() => setLfo(id, { divider: d.value })}
+                  onClick={() => setLfo({ divider: d.value })}
                 >
                   {d.label}
                 </Button>
@@ -271,7 +288,7 @@ function LfoSlotEditor({ id }: { id: LfoSlotId }) {
 
 export function LfoPanel() {
   const [activeSlot, setActiveSlot] = useState<LfoSlotId>('lfo1')
-  const resetLfo = useLfoStore((s) => s.resetLfo)
+  const _resetLfo = useSetAtom(resetLfoAtom)
 
   return (
     <div className="w-full space-y-3">
@@ -295,7 +312,7 @@ export function LfoPanel() {
           ))}
         </ButtonGroup>
         <button
-          onClick={() => resetLfo(activeSlot)}
+          onClick={() => _resetLfo(activeSlot)}
           className="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white/70 transition-colors cursor-pointer"
           title={`Reset ${LFO_LABELS[activeSlot]}`}
         >

@@ -1,8 +1,9 @@
 import { useRef, useEffect } from 'react'
-import { shapedWave, type LfoParamName } from '@/lfo/engine'
-import { computeLfosInOrder } from '@/lfo/graph'
-import { useLfoStore, type LfoSlotId } from '@/store/lfoStore'
-import { useClockStore } from '@/store/clockStore'
+import { type LfoParamName, computeLfosInOrder } from '@almst/lfo'
+import { lfoEngine } from '@/lfo/instance'
+import { appStore } from '@/atoms/store'
+import { lfosAtom, lfoParamModsAtom, lfoParamBaseValuesAtom, ccValuesAtom, type LfoSlotId } from '@/atoms/lfoAtoms'
+import { bpmAtom } from '@/atoms/clockAtoms'
 
 const MODULABLE_PARAMS: LfoParamName[] = ['hz', 'drive', 'symmetry']
 
@@ -29,12 +30,15 @@ export function LfoWavePreview({ lfoId, color = '#6ee7b7' }: LfoWavePreviewProps
     c.scale(dpr, dpr)
 
     function draw() {
-      const { lfos, lfoParamMods, lfoParamBaseValues, ccValues } = useLfoStore.getState()
-      const { bpm } = useClockStore.getState()
+      const lfos = appStore.get(lfosAtom)
+      const lfoParamMods = appStore.get(lfoParamModsAtom)
+      const lfoParamBaseValues = appStore.get(lfoParamBaseValuesAtom)
+      const ccValues = appStore.get(ccValuesAtom)
+      const bpm = appStore.get(bpmAtom)
       const elapsed = performance.now() / 1000
 
       // Compute all LFO outputs with modulation
-      const { outputs: lfoOutputs } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+      const { outputs: lfoOutputs } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues, lfoEngine.noiseState)
 
       // Build effective definition (with modulations applied)
       const baseLfo = lfos[lfoId]
@@ -86,7 +90,7 @@ export function LfoWavePreview({ lfoId, color = '#6ee7b7' }: LfoWavePreviewProps
       const margin = 4
       for (let i = 0; i <= steps; i++) {
         const phase = (i / steps) * 2 + offset
-        const raw = shapedWave(lfo.shape, phase, lfo.drive ?? 0, lfo.symmetry ?? 0.5, `_preview_${lfoId}`, lfo.randomFreq)
+        const raw = lfoEngine.shapedWave(lfo.shape, phase, lfo.drive ?? 0, lfo.symmetry ?? 0.5, `_preview_${lfoId}`, lfo.randomFreq)
 
         let val: number
         if (lfo.bipolar) {

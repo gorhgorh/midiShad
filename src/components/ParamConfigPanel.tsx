@@ -1,11 +1,40 @@
 import { createContext, useContext, useRef, useEffect, useState } from 'react'
 import { motion } from 'motion/react'
-import { useMidiStore } from '../store/midiStore'
-import { useLfoStore, LFO_SLOT_IDS, type LfoSlotId } from '../store/lfoStore'
+import { useAtomValue, useSetAtom } from 'jotai'
+import {
+  selectedDeviceIdAtom,
+  learnTargetAtom,
+  mappingsAtom,
+  relativeFlagsAtom,
+  assignCcAtom,
+  unassignParamAtom,
+  toggleRelativeAtom,
+  midiSourceAtom,
+  selectedServerDeviceAtom,
+  serverDevicesAtom,
+} from '../atoms/midiAtoms'
+import {
+  assignmentsAtom,
+  assignmentStrengthsAtom,
+  assignmentDividersAtom,
+  assignParamAtom,
+  setAssignmentStrengthAtom,
+  setAssignmentDividerAtom,
+  LFO_SLOT_IDS,
+  seenCcsAtom,
+  type LfoSlotId,
+} from '../atoms/lfoAtoms'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DIVIDER_OPTIONS } from '@/lfo/engine'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { DIVIDER_OPTIONS } from '@almst/lfo'
 
 const DIVIDERS = DIVIDER_OPTIONS.filter(d => d.value < 1)
 const MULTIPLIERS = DIVIDER_OPTIONS.filter(d => d.value > 1)
@@ -47,28 +76,41 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
   onCloseRef.current = onClose
 
   // CC state
-  const selectedDeviceId = useMidiStore((s) => s.selectedDeviceId)
-  const learnTarget = useMidiStore((s) => s.learnTarget)
-  const setLearnTarget = useMidiStore((s) => s.setLearnTarget)
-  const assignCc = useMidiStore((s) => s.assignCc)
-  const unassignParam = useMidiStore((s) => s.unassignParam)
-  const toggleRelative = useMidiStore((s) => s.toggleRelative)
-  const ccNumber = useMidiStore((s) => {
-    if (!s.selectedDeviceId) return undefined
-    return s.mappings[s.selectedDeviceId]?.[paramName]
-  })
-  const isRelative = useMidiStore((s) => {
-    if (!s.selectedDeviceId) return false
-    return !!s.relativeFlags[s.selectedDeviceId]?.[paramName]
-  })
+  const selectedDeviceId = useAtomValue(selectedDeviceIdAtom)
+  const learnTarget = useAtomValue(learnTargetAtom)
+  const setLearnTarget = useSetAtom(learnTargetAtom)
+  const _assignCc = useSetAtom(assignCcAtom)
+  const _unassignParam = useSetAtom(unassignParamAtom)
+  const _toggleRelative = useSetAtom(toggleRelativeAtom)
+  const mappings = useAtomValue(mappingsAtom)
+  const relativeFlags = useAtomValue(relativeFlagsAtom)
+  const midiSource = useAtomValue(midiSourceAtom)
+  const selectedServerDevice = useAtomValue(selectedServerDeviceAtom)
+  const serverDevices = useAtomValue(serverDevicesAtom)
+  const seenCcs = useAtomValue(seenCcsAtom)
+
+  // Determine the effective device ID for mappings
+  // For server mode without specific device, use first seen device
+  const serverDeviceForMapping = selectedServerDevice ?? serverDevices[0] ?? null
+  const effectiveDeviceId = midiSource === 'local'
+    ? selectedDeviceId
+    : midiSource === 'server'
+      ? (serverDeviceForMapping ? `server:${serverDeviceForMapping}` : null)
+      : selectedDeviceId // 'all' mode uses local device mappings
+
+  const ccNumber = effectiveDeviceId ? mappings[effectiveDeviceId]?.[paramName] : undefined
+  const isRelative = effectiveDeviceId ? !!relativeFlags[effectiveDeviceId]?.[paramName] : false
 
   // LFO state
-  const lfoAssignment = useLfoStore((s) => s.assignments[paramName] ?? null)
-  const assignParam = useLfoStore((s) => s.assignParam)
-  const assignStrength = useLfoStore((s) => s.assignmentStrengths[paramName] ?? 0.5)
-  const setAssignmentStrength = useLfoStore((s) => s.setAssignmentStrength)
-  const assignDivider = useLfoStore((s) => s.assignmentDividers[paramName] ?? 1)
-  const setAssignmentDivider = useLfoStore((s) => s.setAssignmentDivider)
+  const assignments = useAtomValue(assignmentsAtom)
+  const lfoAssignment = assignments[paramName] ?? null
+  const _assignParam = useSetAtom(assignParamAtom)
+  const strengthValues = useAtomValue(assignmentStrengthsAtom)
+  const assignStrength = strengthValues[paramName] ?? 0.5
+  const _setAssignmentStrength = useSetAtom(setAssignmentStrengthAtom)
+  const dividerValues = useAtomValue(assignmentDividersAtom)
+  const assignDivider = dividerValues[paramName] ?? 1
+  const _setAssignmentDivider = useSetAtom(setAssignmentDividerAtom)
 
   const [divTab, setDivTab] = useState<DivTab>(() => {
     if (assignDivider < 1) return 'div'
@@ -78,7 +120,7 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
 
   function onDivTabClick(tab: DivTab) {
     setDivTab(tab)
-    if (tab === 'none') setAssignmentDivider(paramName, 1)
+    if (tab === 'none') _setAssignmentDivider({ paramName, value: 1 })
   }
 
   const [editing, setEditing] = useState(false)
@@ -113,12 +155,14 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
   // Clear learn target on unmount
   useEffect(() => {
     return () => {
-      const state = useMidiStore.getState()
-      if (state.learnTarget === paramName) {
-        state.setLearnTarget(null)
+      // Use appStore for imperative access at cleanup time
+      // Since we're in a React component, reading atom value at unmount is tricky
+      // We'll check the ref
+      if (learnTarget === paramName) {
+        setLearnTarget(null)
       }
     }
-  }, [paramName])
+  }, [paramName, learnTarget, setLearnTarget])
 
   useEffect(() => {
     if (editing) inputRef.current?.focus()
@@ -136,9 +180,15 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
   function commitEdit() {
     setEditing(false)
     const n = parseInt(draft, 10)
-    if (!selectedDeviceId) return
+    if (!effectiveDeviceId) return
     if (isNaN(n) || n < 0 || n > 127) return
-    assignCc(selectedDeviceId, paramName, n)
+    _assignCc({ deviceId: effectiveDeviceId, paramName, ccNumber: n })
+  }
+
+  function onSelectCc(value: string) {
+    const n = parseInt(value, 10)
+    if (!effectiveDeviceId || isNaN(n)) return
+    _assignCc({ deviceId: effectiveDeviceId, paramName, ccNumber: n })
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -157,7 +207,7 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
       className="absolute right-0 top-0 z-50 w-[280px] bg-black/90 backdrop-blur-md border border-border rounded-lg p-3.5 space-y-3.5"
     >
       {/* CC Section */}
-      {showCc && selectedDeviceId && (
+      {showCc && effectiveDeviceId && (
         <div className="space-y-2">
           <h4 className="text-[10px] text-white/40 uppercase tracking-wide">MIDI CC</h4>
           {editing ? (
@@ -183,6 +233,20 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
               >
                 {isLearning ? 'Cancel' : 'Learn'}
               </Button>
+              {seenCcs.length > 0 && (
+                <Select value={hasCc ? String(ccNumber) : ''} onValueChange={onSelectCc}>
+                  <SelectTrigger className="h-7 w-20 text-xs">
+                    <SelectValue placeholder="CC" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {seenCcs.map((cc) => (
+                      <SelectItem key={cc} value={String(cc)}>
+                        CC{cc}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {hasCc && (
                 <span className="text-xs text-white/70 tabular-nums">CC{ccNumber}</span>
               )}
@@ -195,13 +259,13 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
               >
                 #
               </Button>
-              {hasCc && selectedDeviceId && (
+              {hasCc && effectiveDeviceId && (
                 <>
                   <Button
                     variant={isRelative ? 'default' : 'outline'}
                     size="sm"
                     className="h-7 px-2.5 text-xs"
-                    onClick={() => toggleRelative(selectedDeviceId, paramName)}
+                    onClick={() => _toggleRelative({ deviceId: effectiveDeviceId, paramName })}
                     title={isRelative ? 'Relative mode' : 'Absolute mode'}
                   >
                     Rel
@@ -210,7 +274,7 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
                     variant="outline"
                     size="sm"
                     className="h-7 px-2 text-xs text-destructive-foreground"
-                    onClick={() => unassignParam(selectedDeviceId, paramName)}
+                    onClick={() => _unassignParam({ deviceId: effectiveDeviceId, paramName })}
                     title="Remove CC mapping"
                   >
                     Unmap
@@ -230,7 +294,7 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
             variant={!lfoAssignment ? 'default' : 'outline'}
             size="sm"
             className="h-7 px-2.5 text-xs"
-            onClick={() => assignParam(paramName, null)}
+            onClick={() => _assignParam({ paramName, lfoId: null })}
           >
             None
           </Button>
@@ -241,7 +305,7 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
               size="sm"
               className="h-7 px-2.5 text-xs"
               style={lfoAssignment === id ? { backgroundColor: LFO_COLORS[id] + '30', color: LFO_COLORS[id], borderColor: LFO_COLORS[id] + '80' } : undefined}
-              onClick={() => assignParam(paramName, id)}
+              onClick={() => _assignParam({ paramName, lfoId: id })}
             >
               {i + 1}
             </Button>
@@ -257,7 +321,7 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
                 max={1}
                 step={0.01}
                 value={[assignStrength]}
-                onValueChange={([v]) => setAssignmentStrength(paramName, v)}
+                onValueChange={([v]) => _setAssignmentStrength({ paramName, value: v })}
                 className="flex-1"
               />
               <span className="w-[34px] text-[10px] text-white/40 text-right tabular-nums">
@@ -290,7 +354,7 @@ export function ParamConfigPanel({ paramName, showCc = true, onClose }: ParamCon
                       className={`h-7 w-full px-0 text-[10px] ${assignDivider === d.value
                         ? 'bg-white/15 text-white border-white/20'
                         : 'bg-black text-white/50 border-white/10 hover:bg-white/10 hover:text-white'}`}
-                      onClick={() => setAssignmentDivider(paramName, d.value)}
+                      onClick={() => _setAssignmentDivider({ paramName, value: d.value })}
                     >
                       {d.label}
                     </Button>

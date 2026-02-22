@@ -1,31 +1,36 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
-import { GripVertical } from 'lucide-react'
+import { useAtomValue } from 'jotai'
+import { GripVertical, Plus, X } from 'lucide-react'
 import { FloatingPanel } from './FloatingPanel'
-import { useLfoStore } from '@/store/lfoStore'
-import { useMidiStore } from '@/store/midiStore'
+import { ccState, onCcChange } from '@/render/ccState'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { mappingsAtom, selectedDeviceIdAtom } from '@/atoms/midiAtoms'
+import { activeModuleAtom } from '@/atoms/moduleAtoms'
 
-const HISTORY_LEN = 200 // samples to keep
+const HISTORY_LEN = 200
 const CANVAS_W = 180
 const CANVAS_H = 50
+const MAX_SLOTS = 4
 
-const FIXED_CCS = [81, 82, 83] as const
 const CC_COLORS = ['#6ee7b7', '#93c5fd', '#fca5a5', '#fde68a']
 
 interface CcChannelProps {
   ccNumber: number | null
   color: string
   label: string
-  learnable?: boolean
   onLearn?: () => void
   onSetCc?: (n: number) => void
+  onRemove?: () => void
+  isLearning?: boolean
 }
 
-function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcChannelProps) {
+function CcChannel({ ccNumber, color, label, onLearn, onSetCc, onRemove, isLearning }: CcChannelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const historyRef = useRef<number[]>([])
   const rafRef = useRef<number>(0)
+  const valueRef = useRef(0)
+  const valueLabelRef = useRef<HTMLSpanElement>(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -42,19 +47,23 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
 
     function draw() {
       if (!ctx) return
-      const { ccValues } = useLfoStore.getState()
+      const ccValues = ccState.ccValues
       const val = ccNumber != null ? (ccValues[ccNumber] ?? 0) : 0
       const history = historyRef.current
 
-      // Push new sample, keep fixed length
+      if (val !== valueRef.current) {
+        valueRef.current = val
+        if (valueLabelRef.current) {
+          valueLabelRef.current.textContent = String(val)
+        }
+      }
+
       history.push(val)
       if (history.length > HISTORY_LEN) history.shift()
 
-      // Clear
       ctx.fillStyle = 'rgba(0,0,0,0.85)'
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
 
-      // Grid lines
       ctx.strokeStyle = 'rgba(255,255,255,0.06)'
       ctx.lineWidth = 1
       for (const y of [CANVAS_H * 0.25, CANVAS_H * 0.5, CANVAS_H * 0.75]) {
@@ -64,7 +73,6 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
         ctx.stroke()
       }
 
-      // Draw curve
       if (history.length > 1) {
         ctx.strokeStyle = color
         ctx.lineWidth = 1.5
@@ -77,7 +85,6 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
         }
         ctx.stroke()
 
-        // Current value dot
         const lastX = ((history.length - 1) / (HISTORY_LEN - 1)) * CANVAS_W
         const lastY = CANVAS_H - (val / 127) * CANVAS_H
         ctx.fillStyle = color
@@ -96,8 +103,6 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
     }
   }, [ccNumber, color])
 
-  const ccVal = useLfoStore((s) => ccNumber != null ? (s.ccValues[ccNumber] ?? 0) : 0)
-
   function commitEdit() {
     setEditing(false)
     const n = parseInt(draft, 10)
@@ -109,13 +114,13 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-medium" style={{ color }}>{label}</span>
-          {learnable && !editing && (
+          {!editing && (
             <Button
               variant="outline"
               size="sm"
               className="h-4 px-1 text-[8px]"
               onClick={() => {
-                if (ccNumber == null) {
+                if (ccNumber == null || isLearning) {
                   onLearn?.()
                 } else {
                   setDraft(String(ccNumber))
@@ -123,10 +128,10 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
                 }
               }}
             >
-              {ccNumber != null ? `CC${ccNumber}` : 'Learn'}
+              {isLearning ? '...' : ccNumber != null ? `CC${ccNumber}` : 'Learn'}
             </Button>
           )}
-          {learnable && !editing && ccNumber != null && (
+          {!editing && ccNumber != null && !isLearning && (
             <Button
               variant="outline"
               size="sm"
@@ -137,7 +142,7 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
               L
             </Button>
           )}
-          {learnable && editing && (
+          {editing && (
             <Input
               type="number"
               min={0}
@@ -154,13 +159,21 @@ function CcChannel({ ccNumber, color, label, learnable, onLearn, onSetCc }: CcCh
               autoFocus
             />
           )}
-          {!learnable && (
-            <span className="text-[9px] text-white/40">CC{ccNumber}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span ref={valueLabelRef} className="text-[11px] tabular-nums font-mono" style={{ color }}>
+            {valueRef.current}
+          </span>
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              className="text-white/30 hover:text-white/60 transition-colors"
+              title="Remove slot"
+            >
+              <X size={10} />
+            </button>
           )}
         </div>
-        <span className="text-[11px] tabular-nums font-mono" style={{ color }}>
-          {ccVal}
-        </span>
       </div>
       <canvas
         ref={canvasRef}
@@ -182,28 +195,90 @@ interface CcMonitorProps {
 }
 
 export function CcMonitor({ visible }: CcMonitorProps) {
-  const [customCc, setCustomCc] = useState<number | null>(null)
-  const [learning, setLearning] = useState(false)
+  const mappings = useAtomValue(mappingsAtom)
+  const activeModule = useAtomValue(activeModuleAtom)
+  const selectedDeviceId = useAtomValue(selectedDeviceIdAtom)
 
-  // Listen for any CC to learn the custom channel
+  // Per-module manual overrides: moduleId -> slots array
+  const [moduleOverrides, setModuleOverrides] = useState<Record<string, (number | null)[]>>({})
+  const [learningSlot, setLearningSlot] = useState<number | null>(null)
+
+  const moduleId = activeModule?.id ?? null
+
+  // On module switch: snapshot auto-populated CCs into overrides (once)
+  // so slots are stable and only change via explicit user action
   useEffect(() => {
-    if (!learning) return
-    const unsub = useLfoStore.subscribe((state, prev) => {
-      // Find a CC that just changed
-      for (const [ccStr, val] of Object.entries(state.ccValues)) {
-        const cc = Number(ccStr)
-        if (val !== (prev.ccValues[cc] ?? 0)) {
-          setCustomCc(cc)
-          setLearning(false)
-          break
-        }
-      }
-    })
-    return unsub
-  }, [learning])
+    if (!moduleId) return
+    // Already has an override — don't touch
+    if (moduleOverrides[moduleId]) return
 
-  const handleLearn = useCallback(() => setLearning(true), [])
-  const handleSetCc = useCallback((n: number) => setCustomCc(n), [])
+    if (!activeModule || !selectedDeviceId) {
+      // No mappings available — seed with one empty slot
+      setModuleOverrides((prev) => ({ ...prev, [moduleId]: [null] }))
+      return
+    }
+
+    const deviceMap = mappings[selectedDeviceId]
+    if (!deviceMap) {
+      setModuleOverrides((prev) => ({ ...prev, [moduleId]: [null] }))
+      return
+    }
+
+    const paramNames = new Set(activeModule.params.map((p) => p.name))
+    const ccs: (number | null)[] = []
+    for (const [paramName, ccNumber] of Object.entries(deviceMap)) {
+      if (paramNames.has(paramName) && !ccs.includes(ccNumber)) {
+        ccs.push(ccNumber)
+        if (ccs.length >= MAX_SLOTS) break
+      }
+    }
+
+    setModuleOverrides((prev) => ({
+      ...prev,
+      [moduleId]: ccs.length > 0 ? ccs : [null],
+    }))
+  }, [moduleId]) // only on module switch — not on mappings change
+
+  // Resolved slots — always from overrides (seeded above)
+  const slots: (number | null)[] = (moduleId && moduleOverrides[moduleId]) || [null]
+
+  // Update overrides helper
+  const setSlots = useCallback((newSlots: (number | null)[]) => {
+    if (!moduleId) return
+    setModuleOverrides((prev) => ({ ...prev, [moduleId]: newSlots }))
+  }, [moduleId])
+
+  // CC learn listener
+  useEffect(() => {
+    if (learningSlot == null) return
+    onCcChange((cc) => {
+      const updated = [...slots]
+      if (learningSlot < updated.length) {
+        updated[learningSlot] = cc
+      }
+      setSlots(updated)
+      setLearningSlot(null)
+    })
+    return () => onCcChange(null)
+  }, [learningSlot, slots, setSlots])
+
+  // Clear learning state on module switch
+  useEffect(() => {
+    setLearningSlot(null)
+  }, [moduleId])
+
+  // Build label for a slot — try to find param name from mappings
+  const getLabel = useCallback((ccNumber: number | null, index: number) => {
+    if (ccNumber == null) return `Slot ${index + 1}`
+    if (!selectedDeviceId) return `CC${ccNumber}`
+    const deviceMap = mappings[selectedDeviceId]
+    if (!deviceMap) return `CC${ccNumber}`
+    // Find param mapped to this CC
+    for (const [paramName, cc] of Object.entries(deviceMap)) {
+      if (cc === ccNumber) return paramName
+    }
+    return `CC${ccNumber}`
+  }, [mappings, selectedDeviceId])
 
   return (
     <FloatingPanel
@@ -217,26 +292,40 @@ export function CcMonitor({ visible }: CcMonitorProps) {
       >
         <GripVertical className="h-3.5 w-3.5 text-white/30 shrink-0" />
         <span className="flex-1 text-white text-xs font-medium">CC Monitor</span>
-        {learning && <span className="text-[9px] text-yellow-400 animate-pulse">Move a knob...</span>}
+        {learningSlot != null && <span className="text-[9px] text-yellow-400 animate-pulse">Move a knob...</span>}
       </div>
 
       <div className="pt-3 space-y-3" style={{ width: CANVAS_W }}>
-        {FIXED_CCS.map((cc, i) => (
+        {slots.map((cc, i) => (
           <CcChannel
-            key={cc}
+            key={`${moduleId}-${i}`}
             ccNumber={cc}
-            color={CC_COLORS[i]}
-            label={`Orbit ${['X', 'Y', 'Z'][i]}`}
+            color={CC_COLORS[i % CC_COLORS.length]}
+            label={getLabel(cc, i)}
+            isLearning={learningSlot === i}
+            onLearn={() => setLearningSlot(i)}
+            onSetCc={(n) => {
+              const updated = [...slots]
+              updated[i] = n
+              setSlots(updated)
+            }}
+            onRemove={() => {
+              const updated = slots.filter((_, j) => j !== i)
+              setSlots(updated.length > 0 ? updated : [null])
+            }}
           />
         ))}
-        <CcChannel
-          ccNumber={customCc}
-          color={CC_COLORS[3]}
-          label={customCc != null ? 'Custom' : 'Custom'}
-          learnable
-          onLearn={handleLearn}
-          onSetCc={handleSetCc}
-        />
+        {slots.length < MAX_SLOTS && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-5 text-[9px] text-white/50"
+            onClick={() => setSlots([...slots, null])}
+          >
+            <Plus size={10} className="mr-1" />
+            Add CC
+          </Button>
+        )}
       </div>
     </FloatingPanel>
   )

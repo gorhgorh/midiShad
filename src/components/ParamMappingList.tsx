@@ -1,4 +1,5 @@
-import { useModuleStore } from '../store/moduleStore'
+import { useAtomValue } from 'jotai'
+import { callActionAtom } from '../atoms/moduleAtoms'
 import { ParamRow } from './ParamRow'
 import { OptionRow } from './OptionRow'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,7 @@ interface ParamMappingListProps {
 }
 
 export function ParamMappingList({ params, options, actions }: ParamMappingListProps) {
-  const callAction = useModuleStore((s) => s.callAction)
+  const callAction = useAtomValue(callActionAtom)
 
   return (
     <div className="space-y-3">

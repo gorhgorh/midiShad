@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.3
+
+### CC Monitor
+
+- Reworked: auto-populates slots from current module's mapped CCs instead of hardcoded CC 81/82/83
+- Slots update on module switch — shows CCs relevant to active module params
+- Per-module overrides: manual learn/edit/add/remove persists per module (restored on switch-back)
+- Up to 4 slots with add/remove buttons, each learnable or manually editable
+- Slot labels show mapped param name from device mappings
+
 ## 0.1.2
 
 ### UI Overhaul

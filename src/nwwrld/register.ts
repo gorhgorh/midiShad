@@ -8,6 +8,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js'
 import { Noise } from 'noisejs'
 import * as motion from 'motion'
+import { resolveEasing, SUPPORTED_EASINGS, tweenHelper } from '@almst/easings'
 import { ModuleBase } from './ModuleBase'
 import { BaseThreeJsModule } from './BaseThreeJsModule'
 
@@ -44,6 +45,10 @@ Object.assign(globalThis, {
       return res.ok ? res.json() : null
     } catch { return null }
   },
+  // Easing helpers — matches nw_wrld's globalThis API
+  resolveEasing,
+  SUPPORTED_EASINGS,
+  tween: tweenHelper,
   // THREE loaders from examples/jsm
   OBJLoader,
   PLYLoader,

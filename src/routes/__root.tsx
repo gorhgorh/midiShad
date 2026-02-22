@@ -1,5 +1,6 @@
-import { createRootRoute, Outlet } from '@tanstack/react-router'
+import { createRootRoute, Outlet, useLocation } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
+import { useAtomValue } from 'jotai'
 import { Settings, Component, AudioWaveform, Activity, Save, MonitorPlay, EthernetPort } from 'lucide-react'
 import { ModuleRenderer } from '../components/ModuleRenderer'
 import { ModuleInfoBar } from '../components/ModuleInfoBar'
@@ -11,10 +12,13 @@ import { CcMonitor } from '../components/CcMonitor'
 import { FpsMeter } from '../components/FpsMeter'
 import { MidiDebugPanel } from '../components/MidiDebugPanel'
 import { useMidi } from '../midi/useMidi'
-import { loadPersisted, saveAll } from '../store/persistence'
-import { useModuleStore } from '../store/moduleStore'
-import { useMidiStore } from '../store/midiStore'
-import { useUiStore } from '../store/uiStore'
+import { useServerMidi } from '../midi/useServerMidi'
+import { loadPersisted, saveAll, flushCcToStore } from '../atoms/persistence'
+import { appStore } from '../atoms/store'
+import { setModulesAtom, setActiveModuleAtom } from '../atoms/moduleAtoms'
+import { selectedDeviceIdAtom } from '../atoms/midiAtoms'
+import { setDebugEnabled } from '../atoms/midiDebugAtoms'
+import { scaleAtom } from '../atoms/uiAtoms'
 import '../nwwrld/register'
 import { loadModules, toKebab } from '../nwwrld/loader'
 
@@ -27,6 +31,9 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
+  const location = useLocation()
+  const isModulePage = !location.pathname.startsWith('/srvr')
+
   const [loading, setLoading] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [panelOpen, setPanelOpen] = useState(() => {
@@ -42,8 +49,8 @@ function RootLayout() {
   const [midiDebugOpen, setMidiDebugOpen] = useState(false)
   const [saveFlash, setSaveFlash] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const hasMidi = !!useMidiStore((s) => s.selectedDeviceId)
-  const scale = useUiStore((s) => s.scale)
+  const hasMidi = !!useAtomValue(selectedDeviceIdAtom)
+  const scale = useAtomValue(scaleAtom)
 
   // Track fullscreen state
   useEffect(() => {
@@ -57,14 +64,18 @@ function RootLayout() {
     document.documentElement.setAttribute('data-ui-scale', scale)
   }, [scale])
 
-  // Load modules + persistence on mount
+  // Load modules + persistence on mount (only for module pages)
   const initRef = useRef(false)
   useEffect(() => {
+    if (!isModulePage) {
+      setLoading(false)
+      return
+    }
     if (initRef.current) return
     initRef.current = true
     ;(async () => {
       const mods = await loadModules()
-      useModuleStore.getState().setModules(mods)
+      appStore.set(setModulesAtom, mods)
       loadPersisted()
 
       // URL ?module= param: select module by kebab-case slug
@@ -72,14 +83,15 @@ function RootLayout() {
       const moduleSlug = params.get('module')
       if (moduleSlug) {
         const match = mods.find((m) => toKebab(m.id) === moduleSlug)
-        if (match) useModuleStore.getState().setActiveModule(match.id)
+        if (match) appStore.set(setActiveModuleAtom, match.id)
       }
 
       setLoading(false)
     })()
-  }, [])
+  }, [isModulePage])
 
   useMidi()
+  useServerMidi()
 
   // Persist panel open state
   useEffect(() => {
@@ -94,7 +106,13 @@ function RootLayout() {
     localStorage.setItem(CC_MONITOR_STORAGE_KEY, String(ccMonitorOpen))
   }, [ccMonitorOpen])
 
+  // Sync debug panel visibility to skip expensive logging when hidden
+  useEffect(() => {
+    setDebugEnabled(midiDebugOpen)
+  }, [midiDebugOpen])
+
   const doSave = () => {
+    flushCcToStore()
     saveAll()
     setSaveFlash(true)
     setTimeout(() => setSaveFlash(false), 500)
@@ -151,6 +169,21 @@ function RootLayout() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [settingsOpen, isFullscreen, hasMidi])
+
+  // Save on beforeunload
+  useEffect(() => {
+    function onBeforeUnload() {
+      flushCcToStore()
+      saveAll()
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
+
+  // Non-module pages (like /srvr) render just the Outlet
+  if (!isModulePage) {
+    return <Outlet />
+  }
 
   if (loading) {
     return (

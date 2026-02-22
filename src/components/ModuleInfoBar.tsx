@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useModuleStore } from '../store/moduleStore'
+import { useAtomValue } from 'jotai'
+import { activeModuleAtom } from '../atoms/moduleAtoms'
 import { config } from '../config'
 
 export function ModuleInfoBar() {
-  const activeModule = useModuleStore((s) => s.activeModule)
+  const activeModule = useAtomValue(activeModuleAtom)
   const [visible, setVisible] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null)
 

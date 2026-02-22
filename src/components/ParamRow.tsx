@@ -1,8 +1,12 @@
+import { useMemo } from 'react'
 import { AnimatePresence } from 'motion/react'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { selectAtom } from 'jotai/utils'
 import type { ParamDescriptor } from '../types'
-import { useModuleStore } from '../store/moduleStore'
-import { useMidiStore } from '../store/midiStore'
-import { useLfoStore } from '../store/lfoStore'
+import { paramValuesAtom, setParamValueAtom } from '../atoms/moduleAtoms'
+import { selectedDeviceIdAtom, mappingsAtom } from '../atoms/midiAtoms'
+import { assignmentsAtom, baseValuesAtom, setBaseValueAtom } from '../atoms/lfoAtoms'
+import { useModulatedParam } from '../render/useModulatedValue'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { Settings } from 'lucide-react'
@@ -13,30 +17,48 @@ interface ParamRowProps {
 }
 
 export function ParamRow({ param }: ParamRowProps) {
-  const modulatedValue = useModuleStore((s) => s.paramValues[param.name] ?? param.default)
-  const setParamValue = useModuleStore((s) => s.setParamValue)
-  const lfoAssignment = useLfoStore((s) => s.assignments[param.name] ?? null)
-  const setBaseValue = useLfoStore((s) => s.setBaseValue)
-  const baseValue = useLfoStore((s) => s.baseValues[param.name] ?? param.default)
-  const hasCcMapping = useMidiStore((s) => {
-    const deviceId = s.selectedDeviceId
-    if (!deviceId) return false
-    return s.mappings[deviceId]?.[param.name] != null
-  })
+  // Use selectAtom for targeted subscriptions (avoid re-render on unrelated changes)
+  const paramValueAtom = useMemo(
+    () => selectAtom(paramValuesAtom, (vals) => vals[param.name] ?? param.default),
+    [param.name, param.default]
+  )
+  const storeValue = useAtomValue(paramValueAtom)
+  const _setParamValue = useSetAtom(setParamValueAtom)
+
+  const lfoAssignmentAtom = useMemo(
+    () => selectAtom(assignmentsAtom, (assigns) => assigns[param.name] ?? null),
+    [param.name]
+  )
+  const lfoAssignment = useAtomValue(lfoAssignmentAtom)
+
+  const _setBaseValue = useSetAtom(setBaseValueAtom)
+  const baseValueAtom = useMemo(
+    () => selectAtom(baseValuesAtom, (vals) => vals[param.name] ?? param.default),
+    [param.name, param.default]
+  )
+  const baseValue = useAtomValue(baseValueAtom)
+
+  const selectedDeviceId = useAtomValue(selectedDeviceIdAtom)
+  const mappings = useAtomValue(mappingsAtom)
+  const hasCc = selectedDeviceId ? mappings[selectedDeviceId]?.[param.name] != null : false
+
+  // Low-freq (~10fps) read from renderState for display only
+  const modulatedValue = useModulatedParam(param.name, storeValue)
 
   const { openParam, toggle, close } = useConfigPanel()
   const isConfigOpen = openParam === param.name
 
-  const value = lfoAssignment ? baseValue : modulatedValue
+  // Slider always shows base value (user-controlled), not modulated
+  const sliderValue = lfoAssignment ? baseValue : storeValue
 
   function onSliderChange([v]: number[]) {
-    setParamValue(param.name, v)
-    setBaseValue(param.name, v)
+    _setParamValue({ name: param.name, value: v })
+    _setBaseValue({ paramName: param.name, value: v })
   }
 
   const gearColor = lfoAssignment
-    ? LFO_COLORS[lfoAssignment]
-    : hasCcMapping
+    ? LFO_COLORS[lfoAssignment as keyof typeof LFO_COLORS]
+    : hasCc
       ? 'rgba(255,255,255,0.7)'
       : undefined
 
@@ -50,13 +72,13 @@ export function ParamRow({ param }: ParamRowProps) {
           min={param.min}
           max={param.max}
           step={(param.max - param.min) / 200}
-          value={[value]}
+          value={[sliderValue]}
           onValueChange={onSliderChange}
           className="flex-1"
         />
         <span
           className="w-[42px] text-[10px] text-right tabular-nums"
-          style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment] } : { color: 'rgba(255,255,255,0.7)' }}
+          style={lfoAssignment ? { color: LFO_COLORS[lfoAssignment as keyof typeof LFO_COLORS] } : { color: 'rgba(255,255,255,0.7)' }}
           title={lfoAssignment ? `Base: ${baseValue.toFixed(1)}` : undefined}
         >
           {modulatedValue.toFixed(1)}

@@ -2,11 +2,11 @@ import { useRef, useEffect } from 'react'
 import { GripVertical } from 'lucide-react'
 import { FloatingPanel } from './FloatingPanel'
 import { LfoPanel } from './LfoPanel'
-import { useLfoStore, LFO_SLOT_IDS, type LfoSlotId } from '@/store/lfoStore'
-import { shapedWave } from '@/lfo/engine'
-import { computeLfosInOrder } from '@/lfo/graph'
-import { useClockStore } from '@/store/clockStore'
-import type { LfoParamName } from '@/lfo/engine'
+import { appStore } from '@/atoms/store'
+import { lfosAtom, lfoParamModsAtom, lfoParamBaseValuesAtom, ccValuesAtom, type LfoSlotId } from '@/atoms/lfoAtoms'
+import { bpmAtom } from '@/atoms/clockAtoms'
+import { type LfoParamName, computeLfosInOrder } from '@almst/lfo'
+import { lfoEngine } from '@/lfo/instance'
 
 const SQ = 168
 const MODULABLE_PARAMS: LfoParamName[] = ['hz', 'drive', 'symmetry']
@@ -34,12 +34,15 @@ function LfoSquare({ id }: { id: LfoSlotId }) {
     ctx.scale(dpr, dpr)
 
     function draw() {
-      const { lfos, lfoParamMods, lfoParamBaseValues, ccValues } = useLfoStore.getState()
-      const { bpm } = useClockStore.getState()
+      const lfos = appStore.get(lfosAtom)
+      const lfoParamMods = appStore.get(lfoParamModsAtom)
+      const lfoParamBaseValues = appStore.get(lfoParamBaseValuesAtom)
+      const ccValues = appStore.get(ccValuesAtom)
+      const bpm = appStore.get(bpmAtom)
       const elapsed = performance.now() / 1000
       const color = LFO_COLORS[id]
 
-      const { outputs: lfoOutputs } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues)
+      const { outputs: lfoOutputs } = computeLfosInOrder(lfos, lfoParamMods, lfoParamBaseValues, bpm, elapsed, ccValues, lfoEngine.noiseState)
 
       const baseLfo = lfos[id]
       const effective = { ...baseLfo }
@@ -91,7 +94,7 @@ function LfoSquare({ id }: { id: LfoSlotId }) {
       const margin = 4
       for (let i = 0; i <= SQ; i++) {
         const phase = (i / SQ) * 2 + offset
-        const raw = shapedWave(effective.shape, phase, effective.drive ?? 0, effective.symmetry ?? 0.5, `_overlay_${id}`, effective.randomFreq)
+        const raw = lfoEngine.shapedWave(effective.shape, phase, effective.drive ?? 0, effective.symmetry ?? 0.5, `_overlay_${id}`, effective.randomFreq)
 
         let val: number
         if (effective.bipolar) {

@@ -16,9 +16,10 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { useMidiStore } from '@/store/midiStore'
-import { useClockStore, type ClockSource } from '@/store/clockStore'
-import { useUiStore, type UiScale } from '@/store/uiStore'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { devicesAtom, selectedDeviceIdAtom, midiSourceAtom, serverConnectedAtom, serverDevicesAtom, selectedServerDeviceAtom, serverMaxRateAtom, type MidiSource } from '@/atoms/midiAtoms'
+import { bpmAtom, clockSourceAtom, type ClockSource } from '@/atoms/clockAtoms'
+import { scaleAtom, type UiScale } from '@/atoms/uiAtoms'
 
 interface AppSettingsDialogProps {
   open: boolean
@@ -32,15 +33,23 @@ const SCALES: { value: UiScale; label: string }[] = [
 ]
 
 export function AppSettingsDialog({ open, onOpenChange }: AppSettingsDialogProps) {
-  const devices = useMidiStore((s) => s.devices)
-  const selectedDeviceId = useMidiStore((s) => s.selectedDeviceId)
-  const setSelectedDevice = useMidiStore((s) => s.setSelectedDevice)
-  const bpm = useClockStore((s) => s.bpm)
-  const setBpm = useClockStore((s) => s.setBpm)
-  const clockSource = useClockStore((s) => s.source)
-  const setClockSource = useClockStore((s) => s.setSource)
-  const scale = useUiStore((s) => s.scale)
-  const setScale = useUiStore((s) => s.setScale)
+  const devices = useAtomValue(devicesAtom)
+  const selectedDeviceId = useAtomValue(selectedDeviceIdAtom)
+  const setSelectedDevice = useSetAtom(selectedDeviceIdAtom)
+  const bpm = useAtomValue(bpmAtom)
+  const setBpm = useSetAtom(bpmAtom)
+  const clockSource = useAtomValue(clockSourceAtom)
+  const setClockSource = useSetAtom(clockSourceAtom)
+  const scale = useAtomValue(scaleAtom)
+  const setScale = useSetAtom(scaleAtom)
+  const midiSource = useAtomValue(midiSourceAtom)
+  const setMidiSource = useSetAtom(midiSourceAtom)
+  const serverConnected = useAtomValue(serverConnectedAtom)
+  const serverDevices = useAtomValue(serverDevicesAtom)
+  const selectedServerDevice = useAtomValue(selectedServerDeviceAtom)
+  const setSelectedServerDevice = useSetAtom(selectedServerDeviceAtom)
+  const serverMaxRate = useAtomValue(serverMaxRateAtom)
+  const setServerMaxRate = useSetAtom(serverMaxRateAtom)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,6 +97,80 @@ export function AppSettingsDialog({ open, onOpenChange }: AppSettingsDialogProps
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              MIDI Source
+              {midiSource !== 'local' && (
+                <span className={`w-2 h-2 rounded-full ${serverConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+              )}
+            </Label>
+            <ButtonGroup>
+              {(['local', 'server', 'all'] as const).map((src) => (
+                <Button
+                  key={src}
+                  size="xs"
+                  variant="outline"
+                  className={midiSource === src
+                    ? 'bg-white/15 text-white border-white/20'
+                    : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}
+                  onClick={() => setMidiSource(src as MidiSource)}
+                >
+                  {src === 'local' ? 'Local' : src === 'server' ? 'Server' : 'All'}
+                </Button>
+              ))}
+            </ButtonGroup>
+            <p className="text-xs text-white/50">
+              {midiSource === 'local' && 'WebMIDI (browser)'}
+              {midiSource === 'server' && 'Server via WebSocket'}
+              {midiSource === 'all' && 'Both local and server'}
+            </p>
+          </div>
+
+          {(midiSource === 'server' || midiSource === 'all') && (
+            <>
+              <div className="space-y-2">
+                <Label>Server Device</Label>
+                <Select
+                  value={selectedServerDevice ?? '__all__'}
+                  onValueChange={(v) => setSelectedServerDevice(v === '__all__' ? null : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All devices" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All devices</SelectItem>
+                    {serverDevices.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Update Rate</Label>
+                <ButtonGroup>
+                  {[10, 20, 30, 60].map((rate) => (
+                    <Button
+                      key={rate}
+                      size="xs"
+                      variant="outline"
+                      className={serverMaxRate === rate
+                        ? 'bg-white/15 text-white border-white/20'
+                        : 'bg-black text-white/70 border-white/10 hover:bg-white/10 hover:text-white'}
+                      onClick={() => setServerMaxRate(rate)}
+                    >
+                      {rate}Hz
+                    </Button>
+                  ))}
+                </ButtonGroup>
+                <p className="text-xs text-white/50">
+                  Lower = less CPU, more latency
+                </p>
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label>Clock Source</Label>

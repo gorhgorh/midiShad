@@ -1,6 +1,7 @@
 import { FloatingPanel } from './FloatingPanel'
 import { ParamMappingList } from './ParamMappingList'
-import { useModuleStore } from '@/store/moduleStore'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { activeModuleAtom, resetModuleParamsAtom } from '@/atoms/moduleAtoms'
 import {
   Collapsible,
   CollapsibleContent,
@@ -38,7 +39,7 @@ function SectionHeader({ label, open, onToggle, onReset }: { label: string; open
 }
 
 export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
-  const activeModule = useModuleStore((s) => s.activeModule)
+  const activeModule = useAtomValue(activeModuleAtom)
   const [moduleOpen, setModuleOpen] = useState(true)
   const [transformOpen, setTransformOpen] = useState(true)
   const [openParam, setOpenParam] = useState<string | null>(null)
@@ -47,7 +48,7 @@ export function ModuleControlsPanel({ visible }: ModuleControlsPanelProps) {
   }, [])
   const close = useCallback(() => setOpenParam(null), [])
 
-  const resetModule = useModuleStore((s) => s.resetModuleParams)
+  const resetModule = useSetAtom(resetModuleParamsAtom)
 
   const moduleParams = activeModule?.params.filter((p) => p.group !== 'base') ?? []
   const baseParams = activeModule?.params.filter((p) => p.group === 'base') ?? []
