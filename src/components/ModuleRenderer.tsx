@@ -212,7 +212,7 @@ export function ModuleRenderer() {
       }
     })
 
-    // Subscribe to optionValues changes
+    // Subscribe to optionValues changes — only call methods for options that actually changed
     const unsubOptions = appStore.sub(optionValuesAtom, () => {
       const instance = instanceRef.current
       const activeModule = activeModRef.current
@@ -220,10 +220,12 @@ export function ModuleRenderer() {
 
       const optionValues = appStore.get(optionValuesAtom)
       if (optionValues !== prevOptionValues) {
+        const prev = prevOptionValues
         prevOptionValues = optionValues
+
         const batched: Record<string, Record<string, unknown>> = {}
         for (const opt of activeModule.options) {
-          if (opt.name in optionValues) {
+          if (opt.name in optionValues && optionValues[opt.name] !== prev[opt.name]) {
             const key = opt.methodName
             if (!batched[key]) batched[key] = {}
             batched[key][opt.name] = optionValues[opt.name]

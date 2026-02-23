@@ -8,12 +8,21 @@ import { Input } from '@/components/ui/input'
 import { mappingsAtom, selectedDeviceIdAtom } from '@/atoms/midiAtoms'
 import { activeModuleAtom } from '@/atoms/moduleAtoms'
 
-const HISTORY_LEN = 200
+const HISTORY_LEN = 400
 const CANVAS_W = 180
 const CANVAS_H = 50
 const MAX_SLOTS = 4
+const TRAIL_SEGMENTS = 4 // number of opacity batches for trail
 
 const CC_COLORS = ['#6ee7b7', '#93c5fd', '#fca5a5', '#fde68a']
+
+/** Convert hex color + alpha 0-1 to rgba string */
+function colorAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
 
 interface CcChannelProps {
   ccNumber: number | null
@@ -31,8 +40,6 @@ function CcChannel({ ccNumber, color, label, onLearn, onSetCc, onRemove, isLearn
   const rafRef = useRef<number>(0)
   const valueRef = useRef(0)
   const valueLabelRef = useRef<HTMLSpanElement>(null)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -61,36 +68,57 @@ function CcChannel({ ccNumber, color, label, onLearn, onSetCc, onRemove, isLearn
       history.push(val)
       if (history.length > HISTORY_LEN) history.shift()
 
-      ctx.fillStyle = 'rgba(0,0,0,0.85)'
+      // Clear
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
 
+      // Grid
       ctx.strokeStyle = 'rgba(255,255,255,0.06)'
       ctx.lineWidth = 1
-      for (const y of [CANVAS_H * 0.25, CANVAS_H * 0.5, CANVAS_H * 0.75]) {
+      for (const gy of [CANVAS_H * 0.25, CANVAS_H * 0.5, CANVAS_H * 0.75]) {
         ctx.beginPath()
-        ctx.moveTo(0, y)
-        ctx.lineTo(CANVAS_W, y)
+        ctx.moveTo(0, gy)
+        ctx.lineTo(CANVAS_W, gy)
         ctx.stroke()
       }
 
       if (history.length > 1) {
-        ctx.strokeStyle = color
-        ctx.lineWidth = 1.5
-        ctx.beginPath()
-        for (let i = 0; i < history.length; i++) {
-          const x = (i / (HISTORY_LEN - 1)) * CANVAS_W
-          const y = CANVAS_H - (history[i] / 127) * CANVAS_H
-          if (i === 0) ctx.moveTo(x, y)
-          else ctx.lineTo(x, y)
-        }
-        ctx.stroke()
+        // Additive blending — overlapping lines accumulate brightness
+        ctx.globalCompositeOperation = 'lighter'
 
-        const lastX = ((history.length - 1) / (HISTORY_LEN - 1)) * CANVAS_W
+        const len = history.length
+        const batchSize = Math.ceil(len / TRAIL_SEGMENTS)
+
+        for (let b = 0; b < TRAIL_SEGMENTS; b++) {
+          const start = b * batchSize
+          const end = Math.min(start + batchSize + 1, len) // +1 for overlap
+          if (start >= len) break
+
+          const t = (b + 1) / TRAIL_SEGMENTS // 0.25 → 1.0
+          ctx.strokeStyle = colorAlpha(color, 0.08 + 0.35 * t)
+          ctx.lineWidth = 0.5 + 1.5 * t
+          ctx.beginPath()
+          for (let i = start; i < end; i++) {
+            const x = (i / (HISTORY_LEN - 1)) * CANVAS_W
+            const y = CANVAS_H - (history[i] / 127) * CANVAS_H
+            if (i === start) ctx.moveTo(x, y)
+            else ctx.lineTo(x, y)
+          }
+          ctx.stroke()
+        }
+
+        // Glow dot at leading edge
+        ctx.globalCompositeOperation = 'source-over'
+        const lastX = ((len - 1) / (HISTORY_LEN - 1)) * CANVAS_W
         const lastY = CANVAS_H - (val / 127) * CANVAS_H
+        ctx.shadowColor = color
+        ctx.shadowBlur = 6
         ctx.fillStyle = color
         ctx.beginPath()
         ctx.arc(lastX, lastY, 3, 0, Math.PI * 2)
         ctx.fill()
+        ctx.shadowBlur = 0
       }
 
       rafRef.current = requestAnimationFrame(draw)
@@ -103,62 +131,33 @@ function CcChannel({ ccNumber, color, label, onLearn, onSetCc, onRemove, isLearn
     }
   }, [ccNumber, color])
 
-  function commitEdit() {
-    setEditing(false)
-    const n = parseInt(draft, 10)
-    if (!isNaN(n) && n >= 0 && n <= 127 && onSetCc) onSetCc(n)
-  }
-
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-medium" style={{ color }}>{label}</span>
-          {!editing && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-4 px-1 text-[8px]"
-              onClick={() => {
-                if (ccNumber == null || isLearning) {
-                  onLearn?.()
-                } else {
-                  setDraft(String(ccNumber))
-                  setEditing(true)
-                }
-              }}
-            >
-              {isLearning ? '...' : ccNumber != null ? `CC${ccNumber}` : 'Learn'}
-            </Button>
-          )}
-          {!editing && ccNumber != null && !isLearning && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-4 px-1 text-[8px]"
-              onClick={onLearn}
-              title="Re-learn"
-            >
-              L
-            </Button>
-          )}
-          {editing && (
-            <Input
-              type="number"
-              min={0}
-              max={127}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commitEdit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitEdit()
-                if (e.key === 'Escape') setEditing(false)
-                e.stopPropagation()
-              }}
-              className="w-[42px] h-4 text-[9px] text-center px-1"
-              autoFocus
-            />
-          )}
+          <Input
+            type="number"
+            min={0}
+            max={127}
+            value={ccNumber ?? ''}
+            placeholder="—"
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10)
+              if (!isNaN(n) && n >= 0 && n <= 127) onSetCc?.(n)
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="w-[38px] h-4 text-[9px] text-center px-0.5"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-4 px-1 text-[8px]"
+            onClick={onLearn}
+            title={isLearning ? 'Listening...' : 'Learn CC'}
+          >
+            {isLearning ? '...' : 'L'}
+          </Button>
         </div>
         <div className="flex items-center gap-1">
           <span ref={valueLabelRef} className="text-[11px] tabular-nums font-mono" style={{ color }}>
@@ -182,7 +181,7 @@ function CcChannel({ ccNumber, color, label, onLearn, onSetCc, onRemove, isLearn
           height: CANVAS_H,
           background: '#000',
           border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 3,
+          borderRadius: 8,
           display: 'block',
         }}
       />

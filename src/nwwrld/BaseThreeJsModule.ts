@@ -24,6 +24,13 @@ export class BaseThreeJsModule extends ModuleBase {
         { name: 'zoom', defaultVal: 50, type: 'number', min: 0, max: 100 },
       ],
     },
+    {
+      name: 'mouseControl',
+      executeOnLoad: true,
+      options: [
+        { name: 'mouseOrbit', defaultVal: true, type: 'boolean' },
+      ],
+    },
   ]
 
   scene: THREE.Scene
@@ -94,6 +101,13 @@ export class BaseThreeJsModule extends ModuleBase {
     if (camY !== undefined) this.camera.position.y = camY
     if (camZ !== undefined) this.camera.position.z = camZ
     this.camera.lookAt(this.controls.target)
+  }
+
+  /** Enable or disable mouse-based camera control */
+  mouseControl({ mouseOrbit }: { mouseOrbit?: boolean } = {}) {
+    if (mouseOrbit !== undefined) {
+      this.controls.enabled = mouseOrbit
+    }
   }
 
   /** Set zoom as 0-100% (distance from target) */
